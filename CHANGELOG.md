@@ -28,7 +28,12 @@ Initial public release.
   env only).
 - **CLI**: `simulate`, `replay`, `monitor`, `report`, `export`.
 - **Synthetic worm simulator** for safe demos and end-to-end tests.
-- 92 tests, ~87% line coverage; full docs (threat model, design, deployment,
+- **Deployment**: Dockerfile + Docker Compose, a hardened systemd unit
+  (`CAP_NET_RAW`/`CAP_NET_ADMIN` only, not root), a one-line installer
+  (`install.sh`), and a Prometheus `/metrics` endpoint for Grafana/SIEM.
+- Container/service env overrides: `WYVERN_INTERFACE`, `WYVERN_DATA_DIR`,
+  `WYVERN_WEB_HOST`, `WYVERN_WEB_PORT`.
+- 120+ tests, ~88% line coverage; full docs (threat model, design, deployment,
   alert playbook, contributing).
 
 [0.1.0]: https://github.com/photodoc1960/wyvern/releases/tag/v0.1.0

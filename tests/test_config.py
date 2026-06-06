@@ -48,6 +48,16 @@ def test_env_overrides_secret(monkeypatch):
     assert cfg.notify.smtp_password == "from-env"
 
 
+def test_env_overrides_web_and_iface(monkeypatch):
+    monkeypatch.setenv("WYVERN_WEB_HOST", "0.0.0.0")
+    monkeypatch.setenv("WYVERN_WEB_PORT", "9999")
+    monkeypatch.setenv("WYVERN_INTERFACE", "br-lan")
+    cfg = Config.from_dict({})
+    assert cfg.web_host == "0.0.0.0"
+    assert cfg.web_port == 9999
+    assert cfg.interface == "br-lan"
+
+
 def test_declared_gpu_host():
     cfg = Config(gpu_hosts=("192.168.1.99", "00:04:4b:00:00:01")).validate()
     assert cfg.is_declared_gpu_host("192.168.1.99", None)

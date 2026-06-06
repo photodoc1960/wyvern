@@ -96,6 +96,37 @@ Read [ALERTS.md](ALERTS.md) — it explains every alert and the manual steps to
 take. Remember: **Wyvern never acts for you.** When in doubt, isolate the named
 device and investigate.
 
+## Run it permanently (Docker · systemd · installer)
+
+**One-line installer** — system service as a least-privilege `wyvern` user:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/photodoc1960/wyvern/main/install.sh | sudo bash
+sudo nano /etc/wyvern/wyvern.env        # set WYVERN_INTERFACE=<your LAN iface>
+sudo systemctl start wyvern && journalctl -u wyvern -f
+```
+
+**Docker** (live capture needs host networking + raw-socket caps):
+
+```bash
+docker build -t wyvern .
+docker run -d --name wyvern --net=host \
+  --cap-drop=ALL --cap-add=NET_RAW --cap-add=NET_ADMIN \
+  -e WYVERN_INTERFACE=eth0 -e WYVERN_WEB_HOST=127.0.0.1 \
+  -v wyvern-data:/data wyvern
+```
+
+or `WYVERN_INTERFACE=eth0 docker compose up -d`.
+
+**systemd (manual):** copy `deploy/wyvern.service` to `/etc/systemd/system/` and
+`deploy/wyvern.env` to `/etc/wyvern/`, then `systemctl enable --now wyvern`. The
+unit runs unprivileged with only `CAP_NET_RAW`/`CAP_NET_ADMIN`.
+
+**Metrics / Grafana / SIEM:** the dashboard exposes Prometheus metrics at
+`/metrics` (`wyvern_threat_level`, `wyvern_worm_suspects`,
+`wyvern_alerts_by_severity{…}`, per-device scores). Point Prometheus at
+`http://<host>:8787/metrics`.
+
 ## Updating
 
 ```bash

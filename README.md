@@ -78,6 +78,17 @@ python -m wyvern replay capture.pcap --web
 sudo python -m wyvern monitor -i eth0
 ```
 
+**Run it permanently** — Docker, Compose, a hardened systemd unit, a one-line
+installer, and Prometheus `/metrics` are documented in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md):
+
+```bash
+docker build -t wyvern . && docker run -d --net=host \
+  --cap-drop=ALL --cap-add=NET_RAW --cap-add=NET_ADMIN \
+  -e WYVERN_INTERFACE=eth0 -v wyvern-data:/data wyvern
+# ...or:  curl -fsSL https://raw.githubusercontent.com/photodoc1960/wyvern/main/install.sh | sudo bash
+```
+
 The `simulate` demo prints a report like:
 
 ```

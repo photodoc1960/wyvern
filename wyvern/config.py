@@ -187,18 +187,30 @@ class Config:
         return cls.from_dict(data)
 
     def _with_env_overrides(self) -> "Config":
-        """Apply environment overrides — secrets and a few CLI-equivalents."""
+        """Apply environment overrides — secrets and a few CLI-equivalents.
+
+        Lets containers / systemd configure Wyvern with env vars alone:
+        ``WYVERN_INTERFACE``, ``WYVERN_DATA_DIR``, ``WYVERN_WEB_HOST``,
+        ``WYVERN_WEB_PORT``, and the secret ``WYVERN_SMTP_PASSWORD``.
+        """
         notify = self.notify
         pw = os.environ.get("WYVERN_SMTP_PASSWORD")
         if pw:
             notify = replace(notify, smtp_password=pw)
-        iface = os.environ.get("WYVERN_INTERFACE")
-        data_dir = os.environ.get("WYVERN_DATA_DIR")
+        web_port = self.web_port
+        port_env = os.environ.get("WYVERN_WEB_PORT")
+        if port_env:
+            try:
+                web_port = int(port_env)
+            except ValueError:
+                pass
         return replace(
             self,
             notify=notify,
-            interface=iface or self.interface,
-            data_dir=data_dir or self.data_dir,
+            interface=os.environ.get("WYVERN_INTERFACE") or self.interface,
+            data_dir=os.environ.get("WYVERN_DATA_DIR") or self.data_dir,
+            web_host=os.environ.get("WYVERN_WEB_HOST") or self.web_host,
+            web_port=web_port,
         )
 
     def is_declared_gpu_host(self, ip: str | None, mac: str | None) -> bool:

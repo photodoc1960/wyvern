@@ -1,0 +1,27 @@
+# Wyvern via Docker Compose.
+#   docker compose up -d        # live monitoring
+#   docker compose logs -f
+#
+# Live capture requires host networking (to see LAN traffic) and raw-socket
+# capabilities. The dashboard binds to WYVERN_WEB_HOST on the host; keep it on
+# 127.0.0.1 unless you intend to expose it on your LAN.
+services:
+  wyvern:
+    build: .
+    image: wyvern:latest
+    container_name: wyvern
+    restart: unless-stopped
+    network_mode: host                # required: see all LAN traffic
+    cap_drop: ["ALL"]
+    cap_add: ["NET_RAW", "NET_ADMIN"]  # least privilege for passive capture
+    environment:
+      WYVERN_INTERFACE: "${WYVERN_INTERFACE:-eth0}"
+      WYVERN_WEB_HOST: "${WYVERN_WEB_HOST:-127.0.0.1}"
+      WYVERN_DATA_DIR: "/data"
+      # WYVERN_SMTP_PASSWORD: "${WYVERN_SMTP_PASSWORD}"   # for email digests
+    volumes:
+      - wyvern-data:/data
+    command: ["monitor", "--web"]
+
+volumes:
+  wyvern-data:

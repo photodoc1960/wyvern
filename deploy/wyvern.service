@@ -1,0 +1,33 @@
+[Unit]
+Description=Wyvern passive AI-worm network sentinel
+Documentation=https://github.com/photodoc1960/wyvern
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wyvern
+Group=wyvern
+EnvironmentFile=/etc/wyvern/wyvern.env
+ExecStart=/opt/wyvern/venv/bin/wyvern -c /etc/wyvern/config.yaml monitor
+Restart=always
+RestartSec=10
+
+# Live capture needs raw sockets — grant just those capabilities instead of
+# running as root.
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+
+# Sandboxing: Wyvern only needs to write its own state directory.
+StateDirectory=wyvern
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_PACKET
+ReadWritePaths=/var/lib/wyvern
+
+[Install]
+WantedBy=multi-user.target

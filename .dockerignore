@@ -1,0 +1,20 @@
+# Keep the image small and clean
+.git
+.github
+.claude
+docs
+tests
+deploy
+install.sh
+docker-compose.yml
+*.pdf
+*.pcap
+*.pcapng
+wyvern-data
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+htmlcov
+*.md
+!README.md

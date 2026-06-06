@@ -91,6 +91,55 @@ def export():
     )
 
 
+@api.get("/metrics")
+def metrics():
+    """Prometheus text-exposition metrics for Grafana / SIEM integration."""
+    return Response(_render_prometheus(_monitor()),
+                    mimetype="text/plain; version=0.0.4; charset=utf-8")
+
+
+def _render_prometheus(mon) -> str:
+    stats = mon.stats()
+    assessment = mon.current_assessment()
+    db_stats = mon.db.stats()
+    worm_suspects = sum(1 for t in assessment.device_threats if t.is_worm_suspect)
+    level = int(assessment.overall_level) if assessment.device_threats else 0
+
+    def esc(v: str) -> str:
+        return str(v).replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+
+    out: list[str] = []
+
+    def metric(name, typ, help_, samples):
+        out.append(f"# HELP {name} {help_}")
+        out.append(f"# TYPE {name} {typ}")
+        for labels, value in samples:
+            label_str = "{" + ",".join(f'{k}="{esc(v)}"' for k, v in labels) + "}" if labels else ""
+            out.append(f"{name}{label_str} {value}")
+
+    metric("wyvern_up", "gauge", "1 if the sentinel is running", [([], 1)])
+    metric("wyvern_devices", "gauge", "Tracked devices", [([], stats["devices"])])
+    metric("wyvern_events_processed_total", "counter", "Events processed",
+           [([], stats["events_processed"])])
+    metric("wyvern_frames_processed_total", "counter", "Frames captured",
+           [([], stats["frames_processed"])])
+    metric("wyvern_alerts_total", "counter", "Alerts recorded", [([], db_stats["alerts"])])
+    metric("wyvern_threat_level", "gauge", "Overall threat level (0=none..4=critical)",
+           [([], level)])
+    metric("wyvern_worm_suspects", "gauge", "Devices showing AI-worm signatures",
+           [([], worm_suspects)])
+    metric("wyvern_learning", "gauge", "1 while baselines are still learning",
+           [([], 1 if stats["learning"] else 0)])
+    metric("wyvern_learning_progress", "gauge", "Baseline learning progress (0..1)",
+           [([], stats["learning_progress"])])
+    metric("wyvern_alerts_by_severity", "gauge", "Alerts by severity",
+           [([("severity", k)], v) for k, v in db_stats["alerts_by_severity"].items()])
+    metric("wyvern_device_threat_score", "gauge", "Per-device threat score (0..100)",
+           [([("device", t.label), ("role", t.role), ("level", t.level.label)], round(t.score, 1))
+            for t in assessment.device_threats[:50]])
+    return "\n".join(out) + "\n"
+
+
 @api.get("/api/stream")
 def stream():
     """Server-Sent-Events stream of live alerts, assessments and device updates."""
