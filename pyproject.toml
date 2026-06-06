@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wyvern-sentinel"
+version = "0.1.0"
+description = "Passive, read-only home-network sentinel that detects AI-driven adaptive computer worm (Toronto AI worm) signatures."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["security", "ids", "network-monitoring", "anomaly-detection", "ai-worm", "scapy", "dpkt"]
+authors = [{ name = "Wyvern contributors" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: System Administrators",
+  "Topic :: Security",
+  "Topic :: System :: Networking :: Monitoring",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+  "scapy>=2.5",
+  "dpkt>=1.9",
+  "Flask>=2.2",
+  "flask-cors>=3.0",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+desktop = ["plyer>=2.1"]
+dev = ["pytest>=7.0", "coverage>=7.0"]
+
+[project.scripts]
+wyvern = "wyvern.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/photodoc1960/wyvern"
+Repository = "https://github.com/photodoc1960/wyvern"
+
+[tool.setuptools.packages.find]
+include = ["wyvern*"]
+
+[tool.setuptools.package-data]
+wyvern = ["web/templates/*.html", "web/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["wyvern"]
+omit = ["wyvern/__main__.py"]

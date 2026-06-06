@@ -1,0 +1,44 @@
+name: 🐛 Bug report
+description: Something in Wyvern behaves incorrectly (a crash, wrong decode, etc.)
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For **false positives** (a benign device that triggered an alert), please
+        use the Discussions link instead — it helps us tune defaults for everyone.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Steps, command line, and a pcap or `wyvern simulate` if possible.
+      placeholder: |
+        1. python -m wyvern replay capture.pcap
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Wyvern version / commit
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS and Python version
+      placeholder: "Ubuntu 24.04, Python 3.12"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / traceback
+      render: shell

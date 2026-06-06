@@ -1,0 +1,36 @@
+# Wyvern runtime data (databases, baselines, forensic logs, pcaps)
+wyvern-data/
+*.db
+*.db-wal
+*.db-shm
+*.pcap
+*.pcapng
+baselines.json
+events.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Editors / OS / local agent state
+.vscode/
+.idea/
+.claude/
+*.swp
+.DS_Store
+
+# Keep the worm paper out of the repo (large, copyrighted)
+worm paper.pdf

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wyvern — Network Worm Sentinel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">🐉 <span>Wyvern</span><small>passive AI-worm sentinel</small></div>
+    <div id="banner" class="banner level-none">
+      <span id="banner-level">LOW</span>
+      <span id="banner-summary">Initialising…</span>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/api/export?format=json">Export JSON</a>
+      <a class="btn" href="/api/export?format=csv">Export CSV</a>
+    </div>
+  </header>
+
+  <section id="stats" class="stat-row"></section>
+
+  <main>
+    <section class="panel topo-panel">
+      <h2>Network topology <small>radius ∝ threat · red ring = worm suspect</small></h2>
+      <div id="topology"><svg id="topo-svg" preserveAspectRatio="xMidYMid meet"></svg></div>
+      <div class="legend">
+        <span><i class="dot lvl-Critical"></i>Critical</span>
+        <span><i class="dot lvl-High"></i>High</span>
+        <span><i class="dot lvl-Medium"></i>Medium</span>
+        <span><i class="dot lvl-Low"></i>Low</span>
+        <span><i class="dot lvl-None"></i>Clean</span>
+        <span><i class="edge worm"></i>worm-service flow</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Threat timeline <small id="alert-count"></small></h2>
+      <ul id="alerts" class="timeline"></ul>
+    </section>
+  </main>
+
+  <section class="panel">
+    <h2>Devices</h2>
+    <table id="devices">
+      <thead>
+        <tr><th>Threat</th><th>Device</th><th>IP</th><th>Role</th><th>Vendor</th>
+            <th>OS</th><th>GPU</th><th>Ports</th><th>Watch</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <footer>
+    Wyvern observes, alerts and recommends only — it never modifies devices,
+    processes, credentials or network settings. Signatures from Guan et al.,
+    <em>AI Agents Enable Adaptive Computer Worms</em> (arXiv:2606.03811).
+  </footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

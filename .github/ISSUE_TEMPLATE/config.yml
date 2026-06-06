@@ -1,0 +1,13 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🟡 False positive? Start a Discussion
+    url: https://github.com/photodoc1960/wyvern/discussions/categories/false-positives
+    about: >
+      A benign device tripped an alert? Please post the alert title, the device's
+      role/vendor, and a sanitised evidence snippet so we can tune the defaults.
+  - name: 💬 Questions & deployment help
+    url: https://github.com/photodoc1960/wyvern/discussions/categories/q-a
+    about: Ask about deploying on your network, tuning thresholds, or reading alerts.
+  - name: 🔒 Security / responsible disclosure
+    url: https://github.com/photodoc1960/wyvern/security/advisories/new
+    about: Report a security issue in Wyvern privately.

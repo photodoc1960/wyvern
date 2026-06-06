@@ -1,0 +1,37 @@
+name: 🛡️ New detection rule / threat intel
+description: Propose a new worm signature, detector, or fingerprint
+labels: ["detection", "enhancement"]
+body:
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What behaviour should be detected?
+      description: The malicious/worm behaviour and why it matters on a home network.
+    validations:
+      required: true
+  - type: textarea
+    id: signature
+    attributes:
+      label: Observable network signature
+      description: >
+        What does it look like on the wire? Ports, protocols, timing, fan-out,
+        DNS, etc. (Wyvern is passive — it must be observable without active probing.)
+    validations:
+      required: true
+  - type: input
+    id: stage
+    attributes:
+      label: Which worm stage does it map to?
+      placeholder: "discovery / lateral_movement / credential_reuse / beacon_callback / ..."
+  - type: textarea
+    id: source
+    attributes:
+      label: Source / reference
+      description: Link to the paper, CVE, advisory, or capture this is based on.
+    validations:
+      required: true
+  - type: textarea
+    id: falsepos
+    attributes:
+      label: Likely false positives
+      description: What benign devices/apps might also match, and how to avoid alerting on them?

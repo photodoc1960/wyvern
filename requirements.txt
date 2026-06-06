@@ -1,0 +1,12 @@
+# Wyvern runtime dependencies
+scapy>=2.5        # live packet capture (passive, read-only)
+dpkt>=1.9         # frame analysis / decoding
+Flask>=2.2        # dashboard
+flask-cors>=3.0   # dashboard CORS for the JSON API
+PyYAML>=6.0       # config files
+
+# Optional:
+#   plyer>=2.1     # cross-platform desktop notifications (falls back to notify-send)
+# Dev:
+#   pytest>=7.0
+#   coverage>=7.0

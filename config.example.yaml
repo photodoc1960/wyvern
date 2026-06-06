@@ -1,0 +1,75 @@
+# Wyvern configuration (all fields optional — these are the defaults).
+# Copy to config.yaml and pass with:  wyvern -c config.yaml monitor
+
+# Network interface to capture on (null = scapy's default).
+interface: null
+
+# What counts as "internal" / your LAN. Lateral movement and many detectors
+# only consider traffic within these ranges.
+internal_cidrs:
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16
+  - 169.254.0.0/16
+
+# Optional BPF capture filter (e.g. "not port 22" to drop your own SSH).
+bpf_filter: null
+
+# Devices you KNOW have a GPU and may legitimately serve LLM inference.
+# Listing them suppresses false "inference from non-GPU device" alerts.
+gpu_hosts: []          # e.g. ["192.168.1.99", "00:04:4b:aa:bb:cc"]
+
+# How long to learn each device's normal behaviour before trusting the baseline.
+learning_window_hours: 24
+
+# Where Wyvern stores its SQLite DB, baselines and forensic log.
+data_dir: ./wyvern-data
+
+# Dashboard
+web_enabled: true
+web_host: 127.0.0.1
+web_port: 8787
+
+# How often (seconds) the periodic sweep runs (beacon analysis, assessment).
+sweep_interval_s: 30
+
+# Optional IEEE/Wireshark OUI file to enrich vendor lookups.
+oui_file: null
+
+# ----- Detection thresholds (tune to taste) -----
+thresholds:
+  scan_ports: 50            # >N distinct ports in scan_window_s -> port scan
+  scan_window_s: 300
+  lateral_peers: 10         # >N internal hosts in lateral_window_s -> lateral movement
+  lateral_window_s: 3600
+  dns_rate_per_min: 120     # DNS query spike
+  dns_window_s: 60
+  dns_nxdomain_burst: 25    # NXDOMAIN burst (DGA/C2 enumeration)
+  dga_score: 0.62           # 0..1 "algorithmically-generated domain" threshold
+  cred_distinct_hosts: 5    # auth to >N hosts -> credential reuse
+  cred_window_s: 600
+  cred_fail_reconnects: 8   # rapid retries to one host -> failed-auth shadow
+  inference_rate_per_min: 6
+  inference_window_s: 300
+  beacon_min_callbacks: 6   # regular callbacks to flag a beacon
+  beacon_window_s: 1800
+  beacon_max_cov: 0.20      # max inter-arrival jitter (coefficient of variation)
+  beacon_min_interval_s: 2
+  idle_outbound_conns: 3    # idle device originating >N flows -> code execution
+  idle_window_s: 600
+  worm_stages_high: 2       # distinct worm stages -> HIGH composite verdict
+  worm_stages_critical: 3   # distinct worm stages -> CRITICAL composite verdict
+  worm_window_s: 3600
+
+# ----- Alerting -----
+notify:
+  desktop_enabled: true     # notify-send / plyer
+  min_severity: 3           # 1=Low 2=Medium 3=High 4=Critical
+  email_enabled: false      # OFF by default; sending is your explicit choice
+  smtp_host: null
+  smtp_port: 587
+  smtp_user: null
+  # smtp_password is NEVER read from this file — set WYVERN_SMTP_PASSWORD in the env.
+  email_from: null
+  email_to: []              # e.g. ["you@example.com"]
+  email_digest_min_s: 3600
