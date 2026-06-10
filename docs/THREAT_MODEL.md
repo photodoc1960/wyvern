@@ -88,3 +88,19 @@ PoC deliberately forgoes such evasion.
 - Endpoint/host agents, EDR, or process inspection (Wyvern is network-only).
 - Automated blocking/quarantine (intentionally — see posture above).
 - Deep packet inspection of encrypted traffic or TLS interception.
+
+## Known limitations and evasions
+
+### MCP-based aperiodic C2 bypasses BeaconDetector (2026-06)
+- **Affected detector / component:** `beacon` stage (`BeaconDetector`, `wyvern/detectors/beacon.py`); secondarily `inference_api` detector
+- **Finding:** Janjusevic et al. (2025) document a C2 architecture that routes commands through the Model Context Protocol (MCP) over HTTPS. MCP's asynchronous task-polling is demand-driven and interval-irregular, producing a CoV well above Wyvern's `beacon_max_cov` threshold (≤ 0.20). The traffic is TLS-encrypted and runs on standard HTTPS ports, so neither the beacon stage nor the inference-API detector can distinguish it from ordinary LLM API traffic. The paper explicitly claims "drastic reductions in detection footprint" with "no periodic beaconing."
+- **Within design scope to fix?** No. Resolving this would require TLS interception to inspect JSON-RPC path or application-layer payload — explicitly excluded by Wyvern's passive-sensor design (see "Out of scope" above). JA3/JA4 TLS fingerprinting could narrow the signal but would not defeat a client that randomises its TLS stack.
+- **Candidate future hardening:** JA3/JA4 fingerprint matching against known MCP client libraries as a weak signal; flag persistent long-lived HTTPS sessions to LLM API endpoints from non-GPU hosts as a corroborating indicator.
+- **Source:** Strahinja Janjusevic et al., "Hiding in the AI Traffic: Abusing MCP for LLM-Powered Agentic Red Teaming," arXiv, 2025. https://arxiv.org/abs/2506.02293
+
+### Application-layer LLM-ecosystem worms leave no network signatures (2026-06)
+- **Affected detector / component:** All Wyvern detectors — this propagation class is invisible at the IP/TCP layer
+- **Finding:** Three independent 2025–2026 papers (RAGworm / Cohen et al. at ACM CCS 2025; ClawWorm / Zhang et al. 2026; Zha et al. 2026) confirm a distinct class of self-replicating malware that propagates via LLM application-layer mechanisms: adversarial prompt injection into RAG-indexed content, cross-agent message injection within agent frameworks, and persistent-state hijacking across multi-agent pipelines. Propagation produces no TCP scanning, no lateral movement flows, no port probes, and no beacon callbacks — none of Wyvern's detectors fire. Cohen et al. (ACM CCS 2025) demonstrate super-linear spread (~20 new clients per infected client within 1–3 days). Wyvern may still observe `inference_api` signals if the worm drives high LLM call volume from a non-GPU device, but this is indirect and non-specific.
+- **Within design scope to fix?** No. Detection would require inspecting LLM prompt/response payloads or monitoring agent framework internals — both require endpoint-level access and are outside Wyvern's network-only, passive-sensor scope.
+- **Candidate future hardening:** Anomalous LLM API call volume from a non-GPU device (partially covered by `inference_api`) could be flagged at a lower threshold as a weak corroborating signal; direct detection requires application-layer agent monitoring outside Wyvern's scope.
+- **Source:** Stav Cohen et al., "Here Comes the AI Worm: Preventing the Propagation of Adversarial Self-Replicating Prompts Within GenAI Ecosystems," ACM CCS, 2025. https://dl.acm.org/doi/10.1145/3698900 | Yihao Zhang et al., "ClawWorm: Self-Propagating Attacks Across LLM Agent Ecosystems," arXiv, 2026. https://arxiv.org/abs/2506.02503 | Mingming Zha et al., "Autonomous LLM Agent Worms: Cross-Platform Propagation, Automated Discovery and Temporal Re-Entry Defense," arXiv, 2026.
