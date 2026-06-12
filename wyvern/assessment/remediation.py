@@ -11,7 +11,6 @@ connections in system logs").
 from __future__ import annotations
 
 import dataclasses
-from typing import Optional
 
 from ..constants import (
     STAGE_BEACON,
@@ -25,14 +24,22 @@ from ..constants import (
 from ..models.alert import Alert
 from ..models.device import Device
 
-_ISOLATE = "Isolate {dev} from the network immediately (manually, e.g. unplug or block at the switch/AP)."
-_PROC_SCAN = "Run a process/anti-malware scan on {dev} and look for unexpected agents or LLM runtimes."
+_ISOLATE = (
+    "Isolate {dev} from the network immediately (manually, e.g. unplug or block at the switch/AP)."
+)
+_PROC_SCAN = (
+    "Run a process/anti-malware scan on {dev} and look for unexpected agents or LLM runtimes."
+)
 _CHECK_LOGS = "Check {dev}'s recent connections and authentication entries in its system logs."
 _REBOOT = "Power-cycle / reboot {dev} after capturing evidence (note: a reboot may not remove persistence)."
 _CHANGE_CREDS = "Change credentials on the targeted hosts ({targets}) and rotate any shared keys."
 _CHECK_KEYS = "Inspect ~/.ssh/authorized_keys on the targeted hosts ({targets}) for injected keys."
-_BLOCK_C2 = "Investigate and block the external callback destination ({targets}) at your firewall/router."
-_FIRMWARE = "Treat {dev} as compromised firmware: factory-reset / re-flash it; do not trust a soft reboot."
+_BLOCK_C2 = (
+    "Investigate and block the external callback destination ({targets}) at your firewall/router."
+)
+_FIRMWARE = (
+    "Treat {dev} as compromised firmware: factory-reset / re-flash it; do not trust a soft reboot."
+)
 _INVESTIGATE_DOMAIN = "Review the suspicious domains in {dev}'s DNS history; block them at your resolver if confirmed."
 
 # stage -> ordered list of recommendation templates
@@ -54,8 +61,8 @@ _DETECTOR_RECS: dict[str, tuple[str, ...]] = {
 
 def recommendations_for(
     alert: Alert,
-    device: Optional[Device] = None,
-    targets: Optional[str] = None,
+    device: Device | None = None,
+    targets: str | None = None,
 ) -> tuple[str, ...]:
     """Return manual remediation steps for an alert, with placeholders filled."""
     dev_label = (device.label if device else None) or alert.src_ip or alert.src_mac or "the device"
@@ -73,16 +80,14 @@ def recommendations_for(
     return tuple(out)
 
 
-def enrich(alert: Alert, device: Optional[Device] = None) -> Alert:
+def enrich(alert: Alert, device: Device | None = None) -> Alert:
     """Return a copy of ``alert`` with remediation recommendations attached."""
     if alert.recommendations:
         return alert
-    return dataclasses.replace(
-        alert, recommendations=recommendations_for(alert, device)
-    )
+    return dataclasses.replace(alert, recommendations=recommendations_for(alert, device))
 
 
-def _targets_from_alert(alert: Alert) -> Optional[str]:
+def _targets_from_alert(alert: Alert) -> str | None:
     ev = alert.evidence or {}
     for key in ("sample_hosts", "ssh_targets", "sample_peers"):
         vals = ev.get(key)

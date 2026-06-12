@@ -5,13 +5,22 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Optional
 
 from .. import __version__
 
 _CSV_FIELDS = [
-    "ts", "id", "detector", "severity_label", "confidence", "stage",
-    "src_mac", "src_ip", "dst_ip", "dst_port", "title", "description",
+    "ts",
+    "id",
+    "detector",
+    "severity_label",
+    "confidence",
+    "stage",
+    "src_mac",
+    "src_ip",
+    "dst_ip",
+    "dst_port",
+    "title",
+    "description",
 ]
 
 
@@ -20,7 +29,7 @@ def export_forensic_bundle(
     *,
     devices: list[dict],
     alerts: list[dict],
-    assessment: Optional[dict],
+    assessment: dict | None,
     generated_at: float,
 ) -> str:
     """Write a single JSON evidence bundle (devices + alerts + assessment)."""

@@ -33,7 +33,7 @@ def devices():
 @api.get("/api/alerts")
 def alerts():
     limit = request.args.get("limit", default=200, type=int)
-    limit = max(1, min(limit, 1000))     # clamp to avoid a huge single response
+    limit = max(1, min(limit, 1000))  # clamp to avoid a huge single response
     return jsonify(_monitor().recent_alerts(limit=limit))
 
 
@@ -63,9 +63,10 @@ def export():
     mon = _monitor()
     alerts_data = mon.db.all_alerts()
     if fmt == "csv":
-        from ..storage.export import _CSV_FIELDS  # reuse field order
         import csv
         import io
+
+        from ..storage.export import _CSV_FIELDS  # reuse field order
 
         buf = io.StringIO()
         writer = csv.DictWriter(buf, fieldnames=_CSV_FIELDS, extrasaction="ignore")
@@ -81,7 +82,7 @@ def export():
         "tool": "wyvern",
         "generated_at": time.time(),
         "assessment": mon.current_assessment().to_dict(),
-        "devices": mon.db.all_devices() or [d for d in mon.devices()],
+        "devices": mon.db.all_devices() or list(mon.devices()),
         "alerts": alerts_data,
     }
     return Response(
@@ -94,8 +95,9 @@ def export():
 @api.get("/metrics")
 def metrics():
     """Prometheus text-exposition metrics for Grafana / SIEM integration."""
-    return Response(_render_prometheus(_monitor()),
-                    mimetype="text/plain; version=0.0.4; charset=utf-8")
+    return Response(
+        _render_prometheus(_monitor()), mimetype="text/plain; version=0.0.4; charset=utf-8"
+    )
 
 
 def _render_prometheus(mon) -> str:
@@ -119,24 +121,52 @@ def _render_prometheus(mon) -> str:
 
     metric("wyvern_up", "gauge", "1 if the sentinel is running", [([], 1)])
     metric("wyvern_devices", "gauge", "Tracked devices", [([], stats["devices"])])
-    metric("wyvern_events_processed_total", "counter", "Events processed",
-           [([], stats["events_processed"])])
-    metric("wyvern_frames_processed_total", "counter", "Frames captured",
-           [([], stats["frames_processed"])])
+    metric(
+        "wyvern_events_processed_total",
+        "counter",
+        "Events processed",
+        [([], stats["events_processed"])],
+    )
+    metric(
+        "wyvern_frames_processed_total",
+        "counter",
+        "Frames captured",
+        [([], stats["frames_processed"])],
+    )
     metric("wyvern_alerts_total", "counter", "Alerts recorded", [([], db_stats["alerts"])])
-    metric("wyvern_threat_level", "gauge", "Overall threat level (0=none..4=critical)",
-           [([], level)])
-    metric("wyvern_worm_suspects", "gauge", "Devices showing AI-worm signatures",
-           [([], worm_suspects)])
-    metric("wyvern_learning", "gauge", "1 while baselines are still learning",
-           [([], 1 if stats["learning"] else 0)])
-    metric("wyvern_learning_progress", "gauge", "Baseline learning progress (0..1)",
-           [([], stats["learning_progress"])])
-    metric("wyvern_alerts_by_severity", "gauge", "Alerts by severity",
-           [([("severity", k)], v) for k, v in db_stats["alerts_by_severity"].items()])
-    metric("wyvern_device_threat_score", "gauge", "Per-device threat score (0..100)",
-           [([("device", t.label), ("role", t.role), ("level", t.level.label)], round(t.score, 1))
-            for t in assessment.device_threats[:50]])
+    metric(
+        "wyvern_threat_level", "gauge", "Overall threat level (0=none..4=critical)", [([], level)]
+    )
+    metric(
+        "wyvern_worm_suspects", "gauge", "Devices showing AI-worm signatures", [([], worm_suspects)]
+    )
+    metric(
+        "wyvern_learning",
+        "gauge",
+        "1 while baselines are still learning",
+        [([], 1 if stats["learning"] else 0)],
+    )
+    metric(
+        "wyvern_learning_progress",
+        "gauge",
+        "Baseline learning progress (0..1)",
+        [([], stats["learning_progress"])],
+    )
+    metric(
+        "wyvern_alerts_by_severity",
+        "gauge",
+        "Alerts by severity",
+        [([("severity", k)], v) for k, v in db_stats["alerts_by_severity"].items()],
+    )
+    metric(
+        "wyvern_device_threat_score",
+        "gauge",
+        "Per-device threat score (0..100)",
+        [
+            ([("device", t.label), ("role", t.role), ("level", t.level.label)], round(t.score, 1))
+            for t in assessment.device_threats[:50]
+        ],
+    )
     return "\n".join(out) + "\n"
 
 

@@ -10,7 +10,8 @@ pattern for streaming counters.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any, Hashable, Iterable
+from collections.abc import Hashable, Iterable
+from typing import Any
 
 
 class SlidingWindow:
@@ -116,10 +117,10 @@ def coefficient_of_variation(values: list[float]) -> float | None:
     if mean == 0:
         return None
     var = sum((v - mean) ** 2 for v in values) / n
-    return (var ** 0.5) / mean
+    return (var**0.5) / mean
 
 
 def intervals(timestamps: list[float]) -> list[float]:
     """Inter-arrival gaps between sorted timestamps."""
     ordered = sorted(timestamps)
-    return [b - a for a, b in zip(ordered, ordered[1:])]
+    return [b - a for a, b in zip(ordered, ordered[1:], strict=False)]

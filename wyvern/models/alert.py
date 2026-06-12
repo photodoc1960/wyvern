@@ -8,9 +8,10 @@ remediation recommendations. Wyvern never acts on them automatically.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Mapping
+from typing import Any
 
 
 class Severity(IntEnum):
@@ -24,7 +25,7 @@ class Severity(IntEnum):
         return self.name.capitalize()
 
     @classmethod
-    def from_confidence(cls, confidence: float) -> "Severity":
+    def from_confidence(cls, confidence: float) -> Severity:
         """Map a 0..1 confidence onto the four-level scale."""
         if confidence >= 0.85:
             return cls.CRITICAL
@@ -66,7 +67,7 @@ class Alert:
         return self.severity.label
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Alert":
+    def from_dict(cls, data: dict) -> Alert:
         return cls(
             detector=data.get("detector", "unknown"),
             title=data.get("title", ""),

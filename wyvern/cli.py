@@ -15,7 +15,6 @@ import argparse
 import dataclasses
 import logging
 import sys
-from typing import Optional
 
 from . import __version__
 from .config import Config, ConfigError
@@ -73,7 +72,7 @@ def _load_config(args) -> Config:
     return cfg
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -110,19 +109,22 @@ def _cmd_monitor(cfg: Config, args) -> int:
     try:
         mon.start_live()
     except RuntimeError as exc:
-        print(f"capture error: {exc}\n"
-              "Live capture needs privileges — try 'sudo' or set capabilities on python,\n"
-              "or use 'wyvern simulate' / 'wyvern replay <pcap>' which need none.",
-              file=sys.stderr)
+        print(
+            f"capture error: {exc}\n"
+            "Live capture needs privileges — try 'sudo' or set capabilities on python,\n"
+            "or use 'wyvern simulate' / 'wyvern replay <pcap>' which need none.",
+            file=sys.stderr,
+        )
         return 1
-    print(f"Wyvern monitoring on {cfg.interface or 'default interface'} "
-          f"(Ctrl-C to stop).")
+    print(f"Wyvern monitoring on {cfg.interface or 'default interface'} (Ctrl-C to stop).")
     try:
         if cfg.web_enabled and not args.no_web:
             from .web.app import run_dashboard
+
             run_dashboard(mon, cfg.web_host, cfg.web_port)
         else:
             import time
+
             while True:
                 time.sleep(1)
     except KeyboardInterrupt:
@@ -139,11 +141,11 @@ def _cmd_replay(cfg: Config, args) -> int:
     except RuntimeError as exc:
         print(f"replay error: {exc}", file=sys.stderr)
         return 1
-    print(f"replayed {count} frames; {mon.event_count} events, "
-          f"{len(mon._recent_alerts)} alerts.")
+    print(f"replayed {count} frames; {mon.event_count} events, {len(mon._recent_alerts)} alerts.")
     _print_report(mon.current_assessment())
     if args.web:
         from .web.app import run_dashboard
+
         run_dashboard(mon, cfg.web_host, cfg.web_port)
     return 0
 
@@ -162,6 +164,7 @@ def _cmd_simulate(cfg: Config, args) -> int:
     _print_report(mon.current_assessment())
     if args.web:
         from .web.app import run_dashboard
+
         print(f"\nDashboard: http://{cfg.web_host}:{cfg.web_port}  (Ctrl-C to stop)")
         try:
             run_dashboard(mon, cfg.web_host, cfg.web_port)
@@ -173,10 +176,9 @@ def _cmd_simulate(cfg: Config, args) -> int:
 def _cmd_report(cfg: Config) -> int:
     from .assessment.threat import ThreatAssessor
     from .models.alert import Alert
+    from .models.device import Device
     from .storage.db import WyvernDB
     from .tracking.registry import DeviceRegistry
-
-    from .models.device import Device
 
     db = WyvernDB(cfg.db_path)
     rows = db.all_alerts()
@@ -192,17 +194,21 @@ def _cmd_report(cfg: Config) -> int:
 
 
 def _cmd_export(cfg: Config, args) -> int:
+    import time
+
     from .storage.db import WyvernDB
     from .storage.export import export_alerts_csv, export_forensic_bundle
-    import time
 
     db = WyvernDB(cfg.db_path)
     if args.format == "csv":
         path = export_alerts_csv(args.out, db.all_alerts())
     else:
         path = export_forensic_bundle(
-            args.out, devices=db.all_devices(), alerts=db.all_alerts(),
-            assessment=None, generated_at=time.time(),
+            args.out,
+            devices=db.all_devices(),
+            alerts=db.all_alerts(),
+            assessment=None,
+            generated_at=time.time(),
         )
     print(f"exported {args.format} -> {path}")
     return 0
@@ -219,8 +225,7 @@ def _print_report(assessment) -> None:
         if t.level.value < 2 and not t.is_worm_suspect:
             continue
         flag = " [WORM SUSPECT]" if t.is_worm_suspect else ""
-        print(f"\n  • {t.label} ({t.role}) — {t.level.label} "
-              f"score={t.score:.0f}{flag}")
+        print(f"\n  • {t.label} ({t.role}) — {t.level.label} score={t.score:.0f}{flag}")
         if t.stages:
             print(f"      stages: {', '.join(t.stages)}")
         for rec in t.recommendations[:4]:

@@ -11,20 +11,18 @@ to demonstrate and test detection.
 
 from __future__ import annotations
 
-from typing import List
-
 from ..models.events import ArpEvent, ConnEvent, DnsEvent, HttpEvent, NetworkEvent
 
 # (mac, ip, vendor-role) — vendors chosen so OUI lookup classifies them.
 FAKE_HOME = {
     "router": ("24:a4:3c:00:00:01", "192.168.1.1"),
-    "ws":     ("00:14:22:00:00:50", "192.168.1.50"),   # Dell / Windows (patient zero)
-    "laptop": ("00:1b:21:00:00:51", "192.168.1.51"),   # Intel / benign
-    "gpu":    ("00:04:4b:00:00:99", "192.168.1.99"),   # NVIDIA / inference host
+    "ws": ("00:14:22:00:00:50", "192.168.1.50"),  # Dell / Windows (patient zero)
+    "laptop": ("00:1b:21:00:00:51", "192.168.1.51"),  # Intel / benign
+    "gpu": ("00:04:4b:00:00:99", "192.168.1.99"),  # NVIDIA / inference host
     "printer": ("00:80:77:00:00:30", "192.168.1.30"),  # Brother / idle (Gen-1)
-    "camera": ("44:19:b6:00:00:31", "192.168.1.31"),   # Hikvision
-    "nas":    ("00:11:32:00:00:40", "192.168.1.40"),   # Synology
-    "sensor": ("24:0a:c4:00:00:60", "192.168.1.60"),   # Espressif / IoT
+    "camera": ("44:19:b6:00:00:31", "192.168.1.31"),  # Hikvision
+    "nas": ("00:11:32:00:00:40", "192.168.1.40"),  # Synology
+    "sensor": ("24:0a:c4:00:00:60", "192.168.1.60"),  # Espressif / IoT
 }
 _IP_MAC = {ip: mac for mac, ip in FAKE_HOME.values()}
 # generic internal targets (unknown vendor, locally-administered MACs)
@@ -48,16 +46,30 @@ class _Clock:
 
 def _syn(src_ip, dst_ip, dport, ts, *, ttl=64, sport=44000) -> ConnEvent:
     return ConnEvent(
-        ts=ts, src_ip=src_ip, dst_ip=dst_ip, dst_port=dport, src_port=sport,
-        src_mac=_IP_MAC.get(src_ip), dst_mac=_IP_MAC.get(dst_ip), flags="S", ttl=ttl,
+        ts=ts,
+        src_ip=src_ip,
+        dst_ip=dst_ip,
+        dst_port=dport,
+        src_port=sport,
+        src_mac=_IP_MAC.get(src_ip),
+        dst_mac=_IP_MAC.get(dst_ip),
+        flags="S",
+        ttl=ttl,
         window=64240,
     )
 
 
 def _synack(src_ip, dst_ip, sport, ts, *, ttl=64) -> ConnEvent:
     return ConnEvent(
-        ts=ts, src_ip=src_ip, dst_ip=dst_ip, dst_port=44000, src_port=sport,
-        src_mac=_IP_MAC.get(src_ip), dst_mac=_IP_MAC.get(dst_ip), flags="SA", ttl=ttl,
+        ts=ts,
+        src_ip=src_ip,
+        dst_ip=dst_ip,
+        dst_port=44000,
+        src_port=sport,
+        src_mac=_IP_MAC.get(src_ip),
+        dst_mac=_IP_MAC.get(dst_ip),
+        flags="SA",
+        ttl=ttl,
     )
 
 
@@ -71,15 +83,20 @@ def _dns(src_ip, qname, ts) -> DnsEvent:
 
 def _infer(src_ip, ts) -> HttpEvent:
     return HttpEvent(
-        ts=ts, src_ip=src_ip, dst_ip=FAKE_HOME["gpu"][1], dst_port=8000,
-        method="POST", path="/v1/chat/completions", host="vllm-node",
+        ts=ts,
+        src_ip=src_ip,
+        dst_ip=FAKE_HOME["gpu"][1],
+        dst_port=8000,
+        method="POST",
+        path="/v1/chat/completions",
+        host="vllm-node",
         src_mac=_IP_MAC.get(src_ip),
     )
 
 
-def worm_scenario(start_ts: float = 1_000_000.0) -> List[NetworkEvent]:
+def worm_scenario(start_ts: float = 1_000_000.0) -> list[NetworkEvent]:
     """Return a time-ordered list of events depicting the worm's spread."""
-    ev: List[NetworkEvent] = []
+    ev: list[NetworkEvent] = []
     clk = _Clock(start_ts)
     ws = FAKE_HOME["ws"][1]
     printer = FAKE_HOME["printer"][1]
@@ -88,14 +105,20 @@ def worm_scenario(start_ts: float = 1_000_000.0) -> List[NetworkEvent]:
     # --- Phase 0: device discovery + benign baseline ---------------------
     for ip in [mac_ip[1] for mac_ip in FAKE_HOME.values()]:
         ev.append(_arp(ip, clk.tick()))
-    for mac, ip in _TARGETS:
+    for _mac, ip in _TARGETS:
         ev.append(_arp(ip, clk.tick()))
     # printer & gpu advertise their services; benign hosts browse the web
     ev.append(_synack(printer, ws, 9100, clk.tick()))
     ev.append(_synack(gpu, ws, 8000, clk.tick()))
     for _ in range(3):
         for ip in (ws, FAKE_HOME["laptop"][1]):
-            ev.append(_dns(ip, _BENIGN_DOMAINS[_ % len(_BENIGN_DOMAINS)] if False else _BENIGN_DOMAINS[0], clk.tick()))
+            ev.append(
+                _dns(
+                    ip,
+                    _BENIGN_DOMAINS[_ % len(_BENIGN_DOMAINS)] if False else _BENIGN_DOMAINS[0],
+                    clk.tick(),
+                )
+            )
             ev.append(_syn(ip, "93.184.216.34", 443, clk.tick(), ttl=128, sport=51000))
 
     # --- Phase 1: workstation (patient zero) goes active -----------------
@@ -140,33 +163,43 @@ def worm_scenario(start_ts: float = 1_000_000.0) -> List[NetworkEvent]:
 # --------------------------------------------------------------------------- #
 # Optional pcap output — uses scapy to craft real frames from the same events. #
 # --------------------------------------------------------------------------- #
-def _events_to_packets(events: List[NetworkEvent]):
+def _events_to_packets(events: list[NetworkEvent]):
     from scapy.all import ARP, DNS, DNSQR, IP, TCP, UDP, Ether, Raw  # lazy
 
-    ROUTER = FAKE_HOME["router"][0]
+    router = FAKE_HOME["router"][0]
     packets = []
     for e in events:
         if isinstance(e, ArpEvent):
             pkt = Ether(src=e.src_mac, dst="ff:ff:ff:ff:ff:ff") / ARP(
-                op=e.op, hwsrc=e.src_mac, psrc=e.src_ip,
+                op=e.op,
+                hwsrc=e.src_mac,
+                psrc=e.src_ip,
                 pdst=e.dst_ip or e.src_ip,
             )
         elif isinstance(e, ConnEvent) and e.proto == "tcp":
-            pkt = Ether(src=e.src_mac or ROUTER, dst=e.dst_mac or ROUTER) / IP(
-                src=e.src_ip, dst=e.dst_ip, ttl=e.ttl or 64
-            ) / TCP(sport=e.src_port or 40000, dport=e.dst_port, flags=e.flags or "S")
+            pkt = (
+                Ether(src=e.src_mac or router, dst=e.dst_mac or router)
+                / IP(src=e.src_ip, dst=e.dst_ip, ttl=e.ttl or 64)
+                / TCP(sport=e.src_port or 40000, dport=e.dst_port, flags=e.flags or "S")
+            )
         elif isinstance(e, DnsEvent):
-            pkt = Ether(src=e.src_mac or ROUTER, dst=ROUTER) / IP(
-                src=e.src_ip, dst="192.168.1.1"
-            ) / UDP(sport=51000, dport=53) / DNS(rd=1, qd=DNSQR(qname=e.qname))
+            pkt = (
+                Ether(src=e.src_mac or router, dst=router)
+                / IP(src=e.src_ip, dst="192.168.1.1")
+                / UDP(sport=51000, dport=53)
+                / DNS(rd=1, qd=DNSQR(qname=e.qname))
+            )
         elif isinstance(e, HttpEvent):
             body = (
                 f"{e.method or 'GET'} {e.path or '/'} HTTP/1.1\r\n"
                 f"Host: {e.host or e.dst_ip}\r\nUser-Agent: wyvern-sim\r\n\r\n"
             ).encode()
-            pkt = Ether(src=e.src_mac or ROUTER, dst=_IP_MAC.get(e.dst_ip, ROUTER)) / IP(
-                src=e.src_ip, dst=e.dst_ip
-            ) / TCP(sport=40000, dport=e.dst_port, flags="PA") / Raw(load=body)
+            pkt = (
+                Ether(src=e.src_mac or router, dst=_IP_MAC.get(e.dst_ip, router))
+                / IP(src=e.src_ip, dst=e.dst_ip)
+                / TCP(sport=40000, dport=e.dst_port, flags="PA")
+                / Raw(load=body)
+            )
         else:
             continue
         pkt.time = e.ts
@@ -174,7 +207,7 @@ def _events_to_packets(events: List[NetworkEvent]):
     return packets
 
 
-def write_pcap(path: str, events: List[NetworkEvent] | None = None) -> int:
+def write_pcap(path: str, events: list[NetworkEvent] | None = None) -> int:
     """Write the scenario to a pcap file. Returns the number of packets."""
     from scapy.all import wrpcap  # lazy
 

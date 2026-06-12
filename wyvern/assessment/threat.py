@@ -9,8 +9,8 @@ seen, and a deduplicated list of manual remediation steps.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 
 from ..config import Config
 from ..constants import WORM_STAGES
@@ -42,8 +42,8 @@ def _level_from_score(score: float) -> Severity:
 class DeviceThreat:
     key: str
     label: str
-    mac: Optional[str]
-    ip: Optional[str]
+    mac: str | None
+    ip: str | None
     role: str
     level: Severity
     score: float
@@ -80,7 +80,7 @@ class NetworkAssessment:
     generated_at: float
     overall_level: Severity
     device_threats: tuple[DeviceThreat, ...]
-    likely_compromised: Optional[str]
+    likely_compromised: str | None
     summary: str
 
     def to_dict(self) -> dict:
@@ -95,7 +95,7 @@ class NetworkAssessment:
 
 
 class ThreatAssessor:
-    def __init__(self, config: Optional[Config] = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         self.config = config or Config.default()
         self.horizon = self.config.thresholds.worm_window_s
 
@@ -103,7 +103,7 @@ class ThreatAssessor:
         self,
         alerts: Iterable[Alert],
         registry: DeviceRegistry,
-        now: Optional[float] = None,
+        now: float | None = None,
     ) -> NetworkAssessment:
         alerts = list(alerts)
         if not alerts:
@@ -139,7 +139,9 @@ class ThreatAssessor:
             summary=self._summary(overall, threats, likely),
         )
 
-    def _assess_device(self, key: str, items: list[Alert], registry: DeviceRegistry) -> DeviceThreat:
+    def _assess_device(
+        self, key: str, items: list[Alert], registry: DeviceRegistry
+    ) -> DeviceThreat:
         device = registry.get(key) or registry.get_by_ip(key)
         severities = [a.severity for a in items]
         weights = sorted((_SEVERITY_WEIGHT[s] for s in severities), reverse=True)
@@ -188,7 +190,7 @@ class ThreatAssessor:
         return tuple(seen[:8])
 
     @staticmethod
-    def _summary(overall: Severity, threats, likely: Optional[str]) -> str:
+    def _summary(overall: Severity, threats, likely: str | None) -> str:
         worm_suspects = [t for t in threats if t.is_worm_suspect]
         if worm_suspects:
             names = ", ".join(t.label for t in worm_suspects[:3])

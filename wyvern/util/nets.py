@@ -15,7 +15,7 @@ DEFAULT_PRIVATE_CIDRS: tuple[str, ...] = (
     "172.16.0.0/12",
     "192.168.0.0/16",
     "169.254.0.0/16",
-    "100.64.0.0/10",   # CGNAT, common on some home ISPs
+    "100.64.0.0/10",  # CGNAT, common on some home ISPs
     "fd00::/8",
     "fe80::/10",
 )

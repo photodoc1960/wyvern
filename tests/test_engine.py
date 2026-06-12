@@ -19,7 +19,7 @@ def test_event_bus_pub_sub_and_drop():
     assert bus.subscriber_count == 1
     bus.publish("a")
     bus.publish("b")
-    bus.publish("c")              # full -> oldest dropped
+    bus.publish("c")  # full -> oldest dropped
     items = [q.get_nowait() for _ in range(2)]
     assert items[-1] == "c"
     with __import__("pytest").raises(queue.Empty):

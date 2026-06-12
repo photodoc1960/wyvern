@@ -19,8 +19,8 @@ def test_inference_endpoint_by_path():
 
 
 def test_inference_endpoint_by_port_and_host():
-    assert is_inference_endpoint(None, None, 8000)         # vLLM port
-    assert is_inference_endpoint(None, None, 11434)        # ollama
+    assert is_inference_endpoint(None, None, 8000)  # vLLM port
+    assert is_inference_endpoint(None, None, 11434)  # ollama
     assert is_inference_endpoint("ollama-box", "/", 9999)
     assert not is_inference_endpoint("example.com", "/index.html", 443)
 

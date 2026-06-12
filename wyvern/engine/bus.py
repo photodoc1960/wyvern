@@ -19,7 +19,7 @@ class EventBus:
         self._subscribers: set[queue.Queue] = set()
         self._lock = threading.Lock()
 
-    def subscribe(self) -> "queue.Queue[Any]":
+    def subscribe(self) -> queue.Queue[Any]:
         """Register a subscriber queue. Raises ``RuntimeError`` past the cap so a
         flood of dashboard connections cannot exhaust threads/memory."""
         q: queue.Queue[Any] = queue.Queue(maxsize=self._maxsize)
@@ -29,7 +29,7 @@ class EventBus:
             self._subscribers.add(q)
         return q
 
-    def unsubscribe(self, q: "queue.Queue[Any]") -> None:
+    def unsubscribe(self, q: queue.Queue[Any]) -> None:
         with self._lock:
             self._subscribers.discard(q)
 
@@ -41,7 +41,7 @@ class EventBus:
                 q.put_nowait(message)
             except queue.Full:
                 try:
-                    q.get_nowait()        # drop oldest, make room
+                    q.get_nowait()  # drop oldest, make room
                     q.put_nowait(message)
                 except queue.Empty:
                     pass

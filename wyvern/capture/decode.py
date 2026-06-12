@@ -12,7 +12,6 @@ interface, no root, no scapy.
 from __future__ import annotations
 
 import socket
-from typing import List
 
 import dpkt
 
@@ -64,7 +63,7 @@ def _tcp_flag_letters(flags: int) -> str:
     return "".join(out)
 
 
-def decode_frame(raw: bytes, ts: float) -> List[NetworkEvent]:
+def decode_frame(raw: bytes, ts: float) -> list[NetworkEvent]:
     """Decode one Ethernet frame into zero or more :class:`NetworkEvent`.
 
     Never raises on malformed input — returns ``[]`` instead, because packet
@@ -102,7 +101,7 @@ def decode_frame(raw: bytes, ts: float) -> List[NetworkEvent]:
     return []
 
 
-def _decode_arp(arp: "dpkt.arp.ARP", ts: float) -> List[NetworkEvent]:
+def _decode_arp(arp: dpkt.arp.ARP, ts: float) -> list[NetworkEvent]:
     src_ip = _ip_to_str(arp.spa)
     if not src_ip:
         return []
@@ -119,22 +118,20 @@ def _decode_arp(arp: "dpkt.arp.ARP", ts: float) -> List[NetworkEvent]:
 
 
 def _decode_tcp(
-    tcp: "dpkt.tcp.TCP",
+    tcp: dpkt.tcp.TCP,
     ts: float,
     src_ip: str,
     dst_ip: str,
     src_mac: str,
     dst_mac: str,
     ttl: int | None,
-) -> List[NetworkEvent]:
+) -> list[NetworkEvent]:
     flags = _tcp_flag_letters(tcp.flags)
     payload = bytes(tcp.data) if tcp.data else b""
-    events: List[NetworkEvent] = []
+    events: list[NetworkEvent] = []
 
     if payload:
-        app = _parse_http_or_tls(
-            payload, ts, src_ip, dst_ip, int(tcp.dport), src_mac
-        )
+        app = _parse_http_or_tls(payload, ts, src_ip, dst_ip, int(tcp.dport), src_mac)
         if app is not None:
             events.append(app)
 
@@ -162,13 +159,13 @@ def _decode_tcp(
 
 
 def _decode_udp(
-    udp: "dpkt.udp.UDP",
+    udp: dpkt.udp.UDP,
     ts: float,
     src_ip: str,
     dst_ip: str,
     src_mac: str,
     dst_mac: str,
-) -> List[NetworkEvent]:
+) -> list[NetworkEvent]:
     sport, dport = int(udp.sport), int(udp.dport)
     payload = bytes(udp.data) if udp.data else b""
 
@@ -236,7 +233,14 @@ def _parse_http_or_tls(
 
 
 _HTTP_METHODS = {
-    b"GET", b"POST", b"PUT", b"HEAD", b"DELETE", b"OPTIONS", b"PATCH", b"CONNECT",
+    b"GET",
+    b"POST",
+    b"PUT",
+    b"HEAD",
+    b"DELETE",
+    b"OPTIONS",
+    b"PATCH",
+    b"CONNECT",
 }
 
 
@@ -340,9 +344,7 @@ def _format_answer(rr) -> str | None:
     return None
 
 
-def _parse_dhcp(
-    payload: bytes, ts: float, src_mac: str, src_ip: str | None
-) -> DhcpEvent | None:
+def _parse_dhcp(payload: bytes, ts: float, src_mac: str, src_ip: str | None) -> DhcpEvent | None:
     try:
         dhcp = dpkt.dhcp.DHCP(payload)
     except (dpkt.dpkt.UnpackError, dpkt.dpkt.NeedData, Exception):  # noqa: BLE001

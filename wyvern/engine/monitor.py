@@ -19,7 +19,7 @@ import logging
 import threading
 import time
 from collections import deque
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from ..assessment.remediation import enrich
 from ..assessment.threat import NetworkAssessment, ThreatAssessor
@@ -47,9 +47,9 @@ class Monitor:
         *,
         learn: bool = True,
         notifier=None,
-        bus: Optional[EventBus] = None,
-        db: Optional[WyvernDB] = None,
-        eventlog: Optional[EventLog] = None,
+        bus: EventBus | None = None,
+        db: WyvernDB | None = None,
+        eventlog: EventLog | None = None,
     ) -> None:
         self.config = config
         config.ensure_data_dir()
@@ -72,7 +72,7 @@ class Monitor:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._sniffer = None
-        self._sweeper: Optional[threading.Thread] = None
+        self._sweeper: threading.Thread | None = None
         self.frame_count = 0
         self.event_count = 0
 
@@ -119,7 +119,7 @@ class Monitor:
         self.sweep(now=last_ts or None)
         return out
 
-    def sweep(self, now: Optional[float] = None) -> list[Alert]:
+    def sweep(self, now: float | None = None) -> list[Alert]:
         with self._lock:
             return self._sweep_locked(now if now is not None else time.time())
 
@@ -169,7 +169,7 @@ class Monitor:
         assessment = self.current_assessment(now)
         self.bus.publish({"type": "assessment", "assessment": assessment.to_dict()})
 
-    def current_assessment(self, now: Optional[float] = None) -> NetworkAssessment:
+    def current_assessment(self, now: float | None = None) -> NetworkAssessment:
         with self._lock:
             alerts = list(self._recent_alerts)
             return self.assessor.assess(alerts, self.registry, now=now)
@@ -182,8 +182,10 @@ class Monitor:
             return
         from ..util.nets import is_internal_ip
 
-        if not (is_internal_ip(event.src_ip, self.config.internal_cidrs)
-                and is_internal_ip(event.dst_ip, self.config.internal_cidrs)):
+        if not (
+            is_internal_ip(event.src_ip, self.config.internal_cidrs)
+            and is_internal_ip(event.dst_ip, self.config.internal_cidrs)
+        ):
             return
         src = self.registry.resolve(event.src_ip, event.src_mac)
         dst = self.registry.get_by_ip(event.dst_ip)
@@ -246,17 +248,19 @@ class Monitor:
             threat = threat_by_key.get(device.mac) or (
                 threat_by_key.get(device.ip) if device.ip else None
             )
-            nodes.append({
-                "id": device.mac,
-                "label": device.label,
-                "role": device.role.value,
-                "ip": device.ip,
-                "gpu_capable": device.gpu_capable,
-                "suspicious": device.suspicious,
-                "threat_level": threat.level.label if threat else "None",
-                "threat_score": round(threat.score, 1) if threat else 0.0,
-                "worm_suspect": threat.is_worm_suspect if threat else False,
-            })
+            nodes.append(
+                {
+                    "id": device.mac,
+                    "label": device.label,
+                    "role": device.role.value,
+                    "ip": device.ip,
+                    "gpu_capable": device.gpu_capable,
+                    "suspicious": device.suspicious,
+                    "threat_level": threat.level.label if threat else "None",
+                    "threat_score": round(threat.score, 1) if threat else 0.0,
+                    "worm_suspect": threat.is_worm_suspect if threat else False,
+                }
+            )
         edges = [
             {
                 "src": e["src"],
@@ -311,7 +315,9 @@ class Monitor:
         if self._sweeper is not None:
             return
         self._stop.clear()
-        self._sweeper = threading.Thread(target=self._sweep_loop, daemon=True, name="wyvern-sweeper")
+        self._sweeper = threading.Thread(
+            target=self._sweep_loop, daemon=True, name="wyvern-sweeper"
+        )
         self._sweeper.start()
 
     def _sweep_loop(self) -> None:

@@ -44,7 +44,12 @@ class IdleDeviceExecDetector(Detector):
 
         worm_ports = sorted({p for _, p in targets if is_worm_service_port(p)})
         confidence = clamp01(
-            0.60 + 0.20 * min(1.0, (len(targets) - self.t.idle_outbound_conns) / max(1, self.t.idle_outbound_conns))
+            0.60
+            + 0.20
+            * min(
+                1.0,
+                (len(targets) - self.t.idle_outbound_conns) / max(1, self.t.idle_outbound_conns),
+            )
         )
         if worm_ports:
             confidence = clamp01(confidence + 0.15)
@@ -52,8 +57,7 @@ class IdleDeviceExecDetector(Detector):
         return [
             Alert(
                 detector=self.name,
-                title=f"Code execution on idle {device.role.value} "
-                f"({len(targets)} outbound flows)",
+                title=f"Code execution on idle {device.role.value} ({len(targets)} outbound flows)",
                 severity=Severity.from_confidence(confidence),
                 confidence=confidence,
                 stage=STAGE_REPLICATION,

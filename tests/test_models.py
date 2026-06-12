@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from wyvern.models.alert import Alert, Severity, new_alert_id
 from wyvern.models.device import Device, DeviceRole
 from wyvern.models.events import ConnEvent
@@ -37,18 +35,32 @@ def test_severity_from_confidence():
 
 def test_alert_clamps_and_isolates_evidence():
     ev = {"a": 1}
-    a = Alert(detector="d", title="t", severity=Severity.HIGH, confidence=5.0,
-              description="x", evidence=ev)
+    a = Alert(
+        detector="d",
+        title="t",
+        severity=Severity.HIGH,
+        confidence=5.0,
+        description="x",
+        evidence=ev,
+    )
     assert a.confidence == 1.0
     ev["a"] = 2
-    assert a.evidence["a"] == 1   # copy isolated from caller
+    assert a.evidence["a"] == 1  # copy isolated from caller
     assert a.id and len(a.id) == 12
 
 
 def test_alert_round_trip_dict():
-    a = Alert(detector="port_scan", title="scan", severity=Severity.MEDIUM,
-              confidence=0.6, description="d", src_ip="1.2.3.4", stage="discovery",
-              recommendations=("isolate",), ts=10.0)
+    a = Alert(
+        detector="port_scan",
+        title="scan",
+        severity=Severity.MEDIUM,
+        confidence=0.6,
+        description="d",
+        src_ip="1.2.3.4",
+        stage="discovery",
+        recommendations=("isolate",),
+        ts=10.0,
+    )
     d = a.to_dict()
     a2 = Alert.from_dict(d)
     assert a2.detector == a.detector and a2.severity is Severity.MEDIUM
@@ -56,9 +68,14 @@ def test_alert_round_trip_dict():
 
 
 def test_profile_round_trip_and_queries():
-    p = DeviceProfile(mac="m", learned=True, known_ports=frozenset({22, 443}),
-                      known_internal_peers=frozenset({"192.168.1.2"}),
-                      known_domains=frozenset({"example.com"}), active_hours=frozenset({9, 10}))
+    p = DeviceProfile(
+        mac="m",
+        learned=True,
+        known_ports=frozenset({22, 443}),
+        known_internal_peers=frozenset({"192.168.1.2"}),
+        known_domains=frozenset({"example.com"}),
+        active_hours=frozenset({9, 10}),
+    )
     assert p.is_new_port(8080) and not p.is_new_port(22)
     assert p.is_new_peer("192.168.1.9")
     assert not p.is_new_domain("EXAMPLE.com")

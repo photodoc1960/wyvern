@@ -18,9 +18,17 @@ from wyvern.models.events import ArpEvent
 
 
 def _alert(stage, ts, conf=0.7):
-    return Alert(detector="x", title="t", severity=Severity.from_confidence(conf),
-                 confidence=conf, description="d", src_ip="192.168.1.30",
-                 src_mac="00:80:77:aa:bb:cc", stage=stage, ts=ts)
+    return Alert(
+        detector="x",
+        title="t",
+        severity=Severity.from_confidence(conf),
+        confidence=conf,
+        description="d",
+        src_ip="192.168.1.30",
+        src_mac="00:80:77:aa:bb:cc",
+        stage=stage,
+        ts=ts,
+    )
 
 
 def _ctx(cfg, registry):
@@ -45,7 +53,7 @@ def test_duplicate_stage_not_double_counted(config, registry):
     ctx = _ctx(config, registry)
     w.correlate([_alert(STAGE_RECON, 1)], ctx, 1)
     out = w.correlate([_alert(STAGE_RECON, 2)], ctx, 2)
-    assert out == []      # still only one distinct stage
+    assert out == []  # still only one distinct stage
 
 
 def test_stage_pruning_resets(registry):
@@ -56,7 +64,7 @@ def test_stage_pruning_resets(registry):
     w = WormSignatureCorrelator(cfg)
     ctx = _ctx(cfg, registry)
     w.correlate([_alert(STAGE_RECON, 1)], ctx, 1)
-    assert w.correlate([_alert(STAGE_LATERAL, 2)], ctx, 2)        # 2 stages -> HIGH
+    assert w.correlate([_alert(STAGE_LATERAL, 2)], ctx, 2)  # 2 stages -> HIGH
     # long after the window, only the fresh stage remains in scope
     assert w.active_stages("00:80:77:aa:bb:cc", 500) == []
     assert w.correlate([_alert(STAGE_BEACON, 500)], ctx, 500) == []

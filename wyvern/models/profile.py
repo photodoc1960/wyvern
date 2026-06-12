@@ -10,7 +10,7 @@ across auth services. Detectors consult the profile to turn raw activity into
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +64,7 @@ class DeviceProfile:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "DeviceProfile":
+    def from_dict(cls, data: dict) -> DeviceProfile:
         return cls(
             mac=data["mac"],
             learned=bool(data.get("learned", False)),

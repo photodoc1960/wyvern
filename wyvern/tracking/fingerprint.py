@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from ..models.device import DeviceRole
 
+
 # Initial-TTL fingerprints: observed TTL counts down from the OS default.
 def os_from_ttl(ttl: int | None) -> str | None:
     if ttl is None or ttl <= 0:
@@ -24,14 +25,29 @@ def os_from_ttl(ttl: int | None) -> str | None:
 
 # Hostname substrings -> role (checked in priority order below).
 _HOSTNAME_KEYWORDS: tuple[tuple[DeviceRole, tuple[str, ...]], ...] = (
-    (DeviceRole.PRINTER, ("printer", "print", "laserjet", "officejet", "mfp",
-                           "brother", "epson", "canon")),
-    (DeviceRole.CAMERA, ("camera", "ipcam", "ip-cam", "ipc-", "hikvision",
-                         "dahua", "reolink", "nvr", "doorbell")),
-    (DeviceRole.NAS, ("nas", "synology", "diskstation", "qnap", "truenas",
-                      "freenas", "readynas")),
-    (DeviceRole.ROUTER, ("router", "gateway", "openwrt", "unifi", "fritz",
-                         "eero", "orbi", "mikrotik", "edgerouter")),
+    (
+        DeviceRole.PRINTER,
+        ("printer", "print", "laserjet", "officejet", "mfp", "brother", "epson", "canon"),
+    ),
+    (
+        DeviceRole.CAMERA,
+        ("camera", "ipcam", "ip-cam", "ipc-", "hikvision", "dahua", "reolink", "nvr", "doorbell"),
+    ),
+    (DeviceRole.NAS, ("nas", "synology", "diskstation", "qnap", "truenas", "freenas", "readynas")),
+    (
+        DeviceRole.ROUTER,
+        (
+            "router",
+            "gateway",
+            "openwrt",
+            "unifi",
+            "fritz",
+            "eero",
+            "orbi",
+            "mikrotik",
+            "edgerouter",
+        ),
+    ),
     (DeviceRole.GPU_HOST, ("gpu", "cuda", "dgx", "jetson")),
     (DeviceRole.PHONE, ("iphone", "android", "galaxy", "pixel", "oneplus")),
 )

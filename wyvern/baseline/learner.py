@@ -12,7 +12,6 @@ to absolute thresholds).
 from __future__ import annotations
 
 import time
-from typing import Optional
 
 from ..config import Config
 from ..indicators import inference_confidence, is_auth_port
@@ -34,12 +33,22 @@ class _Acc:
     """Mutable per-device accumulator (internal bookkeeping)."""
 
     __slots__ = (
-        "mac", "started_at", "updated_at", "samples",
-        "ports", "peers", "domains",
-        "ports_win", "max_ports_5m",
-        "peers_win", "max_peers_1h",
-        "auth_win", "ever_auth_fanout", "ever_inference",
-        "minute_counts", "active_hours",
+        "mac",
+        "started_at",
+        "updated_at",
+        "samples",
+        "ports",
+        "peers",
+        "domains",
+        "ports_win",
+        "max_ports_5m",
+        "peers_win",
+        "max_peers_1h",
+        "auth_win",
+        "ever_auth_fanout",
+        "ever_inference",
+        "minute_counts",
+        "active_hours",
     )
 
     def __init__(self, mac: str, started_at: float, t) -> None:
@@ -62,7 +71,7 @@ class _Acc:
 
 
 class BaselineLearner:
-    def __init__(self, config: Optional[Config] = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         self.config = config or Config.default()
         self.t = self.config.thresholds
         self.window_s = self.config.learning_window_hours * 3600.0
@@ -71,9 +80,7 @@ class BaselineLearner:
 
     # ------------------------------------------------------------- ingestion
     def observe(self, event: NetworkEvent, registry: DeviceRegistry) -> None:
-        device = registry.resolve(
-            getattr(event, "src_ip", None), getattr(event, "src_mac", None)
-        )
+        device = registry.resolve(getattr(event, "src_ip", None), getattr(event, "src_mac", None))
         if device is None:
             return
         ts = event.ts
@@ -117,7 +124,7 @@ class BaselineLearner:
                 acc.minute_counts.pop(minute, None)
 
     # --------------------------------------------------------------- queries
-    def get(self, mac: str) -> Optional[DeviceProfile]:
+    def get(self, mac: str) -> DeviceProfile | None:
         acc = self._accs.get(mac)
         if acc is None:
             return None

@@ -71,7 +71,7 @@ class WormSignatureCorrelator:
             if count < self.t.worm_stages_high:
                 continue
             last = self._last_count.get(key, 0)
-            if count < last:                       # stages expired; allow re-growth
+            if count < last:  # stages expired; allow re-growth
                 last = count
             # Fire on first reaching HIGH, on escalation to CRITICAL, and on any
             # further growth (rate-limited) — so an in-progress worm escalates.

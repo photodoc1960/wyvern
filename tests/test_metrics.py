@@ -23,7 +23,7 @@ def test_metrics_exposition(tmp_path):
     body = r.get_data(as_text=True)
     assert "wyvern_up 1" in body
     assert "# TYPE wyvern_devices gauge" in body
-    assert "wyvern_threat_level 4" in body                       # Critical
+    assert "wyvern_threat_level 4" in body  # Critical
     assert "wyvern_worm_suspects 2" in body
     assert 'wyvern_alerts_by_severity{severity="Critical"}' in body
     assert "wyvern_device_threat_score{" in body
@@ -34,4 +34,4 @@ def test_metrics_label_escaping(tmp_path):
     body = _client(tmp_path).get("/metrics").get_data(as_text=True)
     for line in body.splitlines():
         if line.startswith("wyvern_device_threat_score{"):
-            assert line.count('"') % 2 == 0      # balanced quotes
+            assert line.count('"') % 2 == 0  # balanced quotes

@@ -10,9 +10,17 @@ from wyvern.tracking.registry import DeviceRegistry
 
 
 def _alert(detector, stage, sev, conf, ts, src="192.168.1.30"):
-    return Alert(detector=detector, title=detector, severity=sev, confidence=conf,
-                 description="d", src_ip=src, src_mac="00:80:77:aa:bb:cc",
-                 stage=stage, ts=ts)
+    return Alert(
+        detector=detector,
+        title=detector,
+        severity=sev,
+        confidence=conf,
+        description="d",
+        src_ip=src,
+        src_mac="00:80:77:aa:bb:cc",
+        stage=stage,
+        ts=ts,
+    )
 
 
 def test_empty_is_low():

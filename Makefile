@@ -1,9 +1,11 @@
-.PHONY: help install dev test cov demo serve report lint clean
+.PHONY: help install dev lint format test cov demo serve report clean
 
 help:
 	@echo "Wyvern — passive AI-worm network sentinel"
 	@echo "  make install   install runtime dependencies"
 	@echo "  make dev       install runtime + dev dependencies (editable)"
+	@echo "  make lint      ruff lint + format check (no changes)"
+	@echo "  make format    auto-format the codebase with ruff"
 	@echo "  make test      run the test suite"
 	@echo "  make cov       run tests with coverage report"
 	@echo "  make demo      run the synthetic worm scenario + print report"
@@ -16,6 +18,14 @@ install:
 
 dev:
 	python3 -m pip install -e ".[dev,desktop]"
+
+lint:
+	python3 -m ruff check .
+	python3 -m ruff format --check .
+
+format:
+	python3 -m ruff format .
+	python3 -m ruff check --fix .
 
 test:
 	python3 -m pytest

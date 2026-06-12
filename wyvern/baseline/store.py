@@ -39,7 +39,7 @@ def save_baselines(profiles: dict[str, DeviceProfile], path: str) -> None:
 def load_baselines(path: str) -> dict[str, DeviceProfile]:
     """Load profiles from ``path``; return ``{}`` if missing or unreadable."""
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, json.JSONDecodeError):
         return {}

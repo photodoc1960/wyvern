@@ -13,22 +13,21 @@ def test_classifies_printer_from_oui(registry, mk):
 
 
 def test_windows_workstation_ttl(registry, mk):
-    registry.observe(mk.syn("192.168.1.50", "192.168.1.10", 445, 1.0,
-                            mac="00:14:22:00:00:50", ttl=128))
+    registry.observe(
+        mk.syn("192.168.1.50", "192.168.1.10", 445, 1.0, mac="00:14:22:00:00:50", ttl=128)
+    )
     d = registry.get_by_ip("192.168.1.50")
     assert d.os_guess == "Windows" and d.role is DeviceRole.WORKSTATION
 
 
 def test_open_ports_from_synack(registry, mk):
-    registry.observe(mk.synack("192.168.1.10", "192.168.1.50", 22, 1.0,
-                               mac="00:1b:21:00:00:10"))
+    registry.observe(mk.synack("192.168.1.10", "192.168.1.50", 22, 1.0, mac="00:1b:21:00:00:10"))
     d = registry.get_by_ip("192.168.1.10")
     assert 22 in d.open_ports
 
 
 def test_inference_server_marked_gpu(registry, mk):
-    registry.observe(mk.infer("192.168.1.30", "192.168.1.99", 1.0,
-                              mac="00:80:77:aa:bb:cc"))
+    registry.observe(mk.infer("192.168.1.30", "192.168.1.99", 1.0, mac="00:80:77:aa:bb:cc"))
     gpu = registry.get_by_ip("192.168.1.99")
     assert gpu.role is DeviceRole.GPU_HOST and gpu.gpu_capable
 
@@ -46,17 +45,18 @@ def test_mark_suspicious(registry, mk):
     registry.observe(mk.arp("00:80:77:aa:bb:cc", "192.168.1.30", 1.0))
     assert registry.mark_suspicious("192.168.1.30", True)
     assert registry.get("00:80:77:aa:bb:cc").suspicious
-    assert not registry.mark_suspicious("192.168.1.250", True)   # unknown
+    assert not registry.mark_suspicious("192.168.1.250", True)  # unknown
 
 
 def test_device_cap_evicts_oldest(registry, mk, monkeypatch):
-    import wyvern.tracking.registry as R
-    monkeypatch.setattr(R, "_MAX_DEVICES", 3)
+    import wyvern.tracking.registry as reg_mod
+
+    monkeypatch.setattr(reg_mod, "_MAX_DEVICES", 3)
     for i in range(5):
         registry.observe(mk.arp(f"02:00:00:00:00:0{i}", f"192.168.1.{10 + i}", float(i)))
     assert len(registry.all()) <= 3
-    assert registry.get("02:00:00:00:00:04") is not None      # newest survives
-    assert registry.get("02:00:00:00:00:00") is None          # oldest evicted
+    assert registry.get("02:00:00:00:00:04") is not None  # newest survives
+    assert registry.get("02:00:00:00:00:00") is None  # oldest evicted
 
 
 def test_dhcp_hostname_classifies(registry, mk):

@@ -5,7 +5,6 @@ from __future__ import annotations
 import socket
 
 import dpkt
-import pytest
 
 from wyvern.capture.decode import decode_frame
 from wyvern.models.events import ArpEvent, ConnEvent, DhcpEvent, DnsEvent, HttpEvent
@@ -54,10 +53,10 @@ def test_decode_dns_query_and_nxdomain():
 
 
 def test_decode_http_inference():
-    body = (b"POST /v1/chat/completions HTTP/1.1\r\nHost: gpu.local\r\n"
-            b"User-Agent: requests\r\n\r\n{}")
-    tcp = dpkt.tcp.TCP(sport=40000, dport=8000,
-                       flags=dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK, data=body)
+    body = (
+        b"POST /v1/chat/completions HTTP/1.1\r\nHost: gpu.local\r\nUser-Agent: requests\r\n\r\n{}"
+    )
+    tcp = dpkt.tcp.TCP(sport=40000, dport=8000, flags=dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK, data=body)
     ip = dpkt.ip.IP(src=A, dst=B, p=dpkt.ip.IP_PROTO_TCP, ttl=64, data=tcp)
     evs = decode_frame(_eth(ip, dpkt.ethernet.ETH_TYPE_IP), 1.0)
     http = [e for e in evs if isinstance(e, HttpEvent)][0]
@@ -68,8 +67,9 @@ def test_decode_dhcp_hostname():
     opts = [(12, b"my-printer"), (55, bytes([1, 3, 6]))]
     dhcp = dpkt.dhcp.DHCP(chaddr=SMAC + b"\x00" * 10, opts=opts)
     udp = dpkt.udp.UDP(sport=68, dport=67, data=dhcp)
-    ip = dpkt.ip.IP(src=b"\x00\x00\x00\x00", dst=b"\xff\xff\xff\xff",
-                    p=dpkt.ip.IP_PROTO_UDP, ttl=64, data=udp)
+    ip = dpkt.ip.IP(
+        src=b"\x00\x00\x00\x00", dst=b"\xff\xff\xff\xff", p=dpkt.ip.IP_PROTO_UDP, ttl=64, data=udp
+    )
     evs = decode_frame(_eth(ip, dpkt.ethernet.ETH_TYPE_IP), 1.0)
     dh = [e for e in evs if isinstance(e, DhcpEvent)][0]
     assert dh.hostname == "my-printer" and dh.param_list == (1, 3, 6)

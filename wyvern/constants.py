@@ -81,8 +81,38 @@ AUTH_PORTS: dict[int, str] = {
 # Well-known/expected ports — a beacon to anything *outside* this set on a regular
 # cadence is the worm's "callback on a non-standard port" signature (§5).
 STANDARD_SERVICE_PORTS: frozenset[int] = frozenset(
-    {20, 21, 22, 25, 53, 67, 68, 80, 110, 123, 135, 137, 138, 139, 143, 161,
-     389, 443, 445, 465, 514, 587, 631, 636, 853, 993, 995, 1900, 3389, 5353}
+    {
+        20,
+        21,
+        22,
+        25,
+        53,
+        67,
+        68,
+        80,
+        110,
+        123,
+        135,
+        137,
+        138,
+        139,
+        143,
+        161,
+        389,
+        443,
+        445,
+        465,
+        514,
+        587,
+        631,
+        636,
+        853,
+        993,
+        995,
+        1900,
+        3389,
+        5353,
+    }
 )
 
 # --------------------------------------------------------------------------- #
@@ -103,16 +133,22 @@ INFERENCE_PATH_MARKERS: tuple[str, ...] = (
     "/infer",
 )
 INFERENCE_HOST_MARKERS: tuple[str, ...] = (
-    "llm", "vllm", "ollama", "inference", "triton", "tgi", "gpu",
+    "llm",
+    "vllm",
+    "ollama",
+    "inference",
+    "triton",
+    "tgi",
+    "gpu",
 )
 
 # --------------------------------------------------------------------------- #
 # Worm propagation "stages" — the composite signature correlator fuses these   #
 # per-device weak signals into a high-confidence AI-worm verdict.              #
 # --------------------------------------------------------------------------- #
-STAGE_RECON = "discovery"            # port/service scanning
-STAGE_LATERAL = "lateral_movement"   # many internal peers
-STAGE_EXPLOIT = "exploit_attempt"    # traffic to worm service ports
+STAGE_RECON = "discovery"  # port/service scanning
+STAGE_LATERAL = "lateral_movement"  # many internal peers
+STAGE_EXPLOIT = "exploit_attempt"  # traffic to worm service ports
 STAGE_CREDENTIAL = "credential_reuse"
 STAGE_SSH_KEY = "ssh_key_injection"
 STAGE_INFERENCE = "inference_proxy"  # reasoning routed to GPU host
@@ -120,12 +156,15 @@ STAGE_BEACON = "beacon_callback"
 STAGE_REPLICATION = "idle_device_exec"
 
 WORM_STAGES: tuple[str, ...] = (
-    STAGE_RECON, STAGE_LATERAL, STAGE_EXPLOIT, STAGE_CREDENTIAL,
-    STAGE_SSH_KEY, STAGE_INFERENCE, STAGE_BEACON, STAGE_REPLICATION,
+    STAGE_RECON,
+    STAGE_LATERAL,
+    STAGE_EXPLOIT,
+    STAGE_CREDENTIAL,
+    STAGE_SSH_KEY,
+    STAGE_INFERENCE,
+    STAGE_BEACON,
+    STAGE_REPLICATION,
 )
 
 # Human-readable paper reference attached to worm-signature alerts.
-PAPER_REFERENCE = (
-    "Guan et al., 'AI Agents Enable Adaptive Computer Worms', "
-    "arXiv:2606.03811 (2026)"
-)
+PAPER_REFERENCE = "Guan et al., 'AI Agents Enable Adaptive Computer Worms', arXiv:2606.03811 (2026)"

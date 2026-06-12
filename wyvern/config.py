@@ -34,14 +34,14 @@ class Thresholds:
     # Credential spray / reuse: one source hitting auth services on N hosts.
     cred_distinct_hosts: int = 5
     cred_window_s: float = 600.0
-    cred_fail_reconnects: int = 8        # rapid re-tries to one host = failed auth
+    cred_fail_reconnects: int = 8  # rapid re-tries to one host = failed auth
     # Inference proxy: inference requests/min from a single device.
     inference_rate_per_min: float = 6.0
     inference_window_s: float = 300.0
     # Beaconing: regular callbacks on a non-standard port.
     beacon_min_callbacks: int = 6
     beacon_window_s: float = 1800.0
-    beacon_max_cov: float = 0.20         # inter-arrival coefficient of variation
+    beacon_max_cov: float = 0.20  # inter-arrival coefficient of variation
     beacon_min_interval_s: float = 2.0
     # Idle-device code execution (printer/router/NAS suddenly active).
     idle_outbound_conns: int = 3
@@ -53,16 +53,27 @@ class Thresholds:
 
     def validate(self) -> None:
         for name in (
-            "scan_ports", "lateral_peers", "dns_nxdomain_burst",
-            "cred_distinct_hosts", "cred_fail_reconnects",
-            "beacon_min_callbacks", "idle_outbound_conns",
-            "worm_stages_high", "worm_stages_critical",
+            "scan_ports",
+            "lateral_peers",
+            "dns_nxdomain_burst",
+            "cred_distinct_hosts",
+            "cred_fail_reconnects",
+            "beacon_min_callbacks",
+            "idle_outbound_conns",
+            "worm_stages_high",
+            "worm_stages_critical",
         ):
             if getattr(self, name) <= 0:
                 raise ConfigError(f"threshold '{name}' must be positive")
         for name in (
-            "scan_window_s", "lateral_window_s", "dns_window_s", "cred_window_s",
-            "inference_window_s", "beacon_window_s", "idle_window_s", "worm_window_s",
+            "scan_window_s",
+            "lateral_window_s",
+            "dns_window_s",
+            "cred_window_s",
+            "inference_window_s",
+            "beacon_window_s",
+            "idle_window_s",
+            "worm_window_s",
         ):
             if getattr(self, name) <= 0:
                 raise ConfigError(f"window '{name}' must be positive")
@@ -77,12 +88,12 @@ class Thresholds:
 @dataclass(frozen=True, slots=True)
 class NotifyConfig:
     desktop_enabled: bool = True
-    min_severity: int = 3                 # notify on HIGH+ by default
-    email_enabled: bool = False           # OFF unless explicitly configured
+    min_severity: int = 3  # notify on HIGH+ by default
+    email_enabled: bool = False  # OFF unless explicitly configured
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_user: str | None = None
-    smtp_password: str | None = None      # injected from env only
+    smtp_password: str | None = None  # injected from env only
     email_from: str | None = None
     email_to: tuple[str, ...] = ()
     email_digest_min_s: float = 3600.0
@@ -107,7 +118,7 @@ class Config:
     interface: str | None = None
     internal_cidrs: tuple[str, ...] = DEFAULT_PRIVATE_CIDRS
     bpf_filter: str | None = None
-    gpu_hosts: tuple[str, ...] = ()        # IPs or MACs declared GPU-capable
+    gpu_hosts: tuple[str, ...] = ()  # IPs or MACs declared GPU-capable
     learning_window_hours: float = 24.0
     data_dir: str = "./wyvern-data"
     web_enabled: bool = True
@@ -134,7 +145,7 @@ class Config:
     def ensure_data_dir(self) -> None:
         Path(self.data_dir).mkdir(parents=True, exist_ok=True)
 
-    def validate(self) -> "Config":
+    def validate(self) -> Config:
         if self.learning_window_hours <= 0:
             raise ConfigError("learning_window_hours must be positive")
         if not (0 < self.web_port < 65536):
@@ -144,6 +155,7 @@ class Config:
         if not self.internal_cidrs:
             raise ConfigError("internal_cidrs must not be empty")
         import ipaddress
+
         for cidr in self.internal_cidrs:
             try:
                 ipaddress.ip_network(cidr, strict=False)
@@ -155,11 +167,11 @@ class Config:
 
     # ---- constructors ----
     @classmethod
-    def default(cls) -> "Config":
+    def default(cls) -> Config:
         return cls().validate()
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Config":
+    def from_dict(cls, data: dict) -> Config:
         data = dict(data or {})
         thresholds = Thresholds(**(data.pop("thresholds", {}) or {}))
         notify_raw = dict(data.pop("notify", {}) or {})
@@ -175,10 +187,11 @@ class Config:
         return cfg.validate()
 
     @classmethod
-    def from_file(cls, path: str) -> "Config":
+    def from_file(cls, path: str) -> Config:
         import yaml  # lazy: only needed when loading a file
+
         try:
-            with open(path, "r", encoding="utf-8") as fh:
+            with open(path, encoding="utf-8") as fh:
                 data = yaml.safe_load(fh) or {}
         except OSError as exc:
             raise ConfigError(f"cannot read config file {path!r}: {exc}") from exc
@@ -186,7 +199,7 @@ class Config:
             raise ConfigError(f"config file {path!r} must contain a mapping")
         return cls.from_dict(data)
 
-    def _with_env_overrides(self) -> "Config":
+    def _with_env_overrides(self) -> Config:
         """Apply environment overrides — secrets and a few CLI-equivalents.
 
         Lets containers / systemd configure Wyvern with env vars alone:

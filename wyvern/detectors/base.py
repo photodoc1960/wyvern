@@ -9,7 +9,7 @@ domain objects they read and the alerts they emit are immutable.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Protocol
+from typing import Protocol
 
 from ..config import Config
 from ..models.alert import Alert
@@ -21,14 +21,14 @@ from ..util.nets import is_internal_ip
 
 
 class ProfileProvider(Protocol):
-    def get(self, mac: str) -> Optional[DeviceProfile]:  # pragma: no cover - protocol
+    def get(self, mac: str) -> DeviceProfile | None:  # pragma: no cover - protocol
         ...
 
 
 class NullProfiles:
     """A profile provider that knows nothing (used before/without baselines)."""
 
-    def get(self, mac: str) -> Optional[DeviceProfile]:
+    def get(self, mac: str) -> DeviceProfile | None:
         return None
 
 
@@ -39,20 +39,20 @@ class DetectorContext:
     profiles: ProfileProvider = field(default_factory=NullProfiles)
     now: float = 0.0
 
-    def internal(self, ip: Optional[str]) -> bool:
+    def internal(self, ip: str | None) -> bool:
         return is_internal_ip(ip, self.config.internal_cidrs)
 
-    def device_for(self, event: NetworkEvent) -> Optional[Device]:
+    def device_for(self, event: NetworkEvent) -> Device | None:
         src_mac = getattr(event, "src_mac", None)
         src_ip = getattr(event, "src_ip", None)
         return self.registry.resolve(src_ip, src_mac)
 
-    def profile_for(self, event: NetworkEvent) -> Optional[DeviceProfile]:
+    def profile_for(self, event: NetworkEvent) -> DeviceProfile | None:
         device = self.device_for(event)
         return self.profiles.get(device.mac) if device else None
 
 
-def source_id(event: NetworkEvent) -> Optional[str]:
+def source_id(event: NetworkEvent) -> str | None:
     """A stable per-source key: MAC if known, else source IP."""
     mac = getattr(event, "src_mac", None)
     if mac:
