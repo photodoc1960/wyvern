@@ -22,8 +22,16 @@ Wyvern **observes, alerts, and recommends.** That boundary is the whole point.
 git clone https://github.com/photodoc1960/wyvern.git
 cd wyvern
 pip install -e ".[dev,desktop]"
-make test          # 92 tests
+make lint          # ruff check + format check
+make test          # 127 tests
 make cov           # coverage (keep it ≥ 80%)
+```
+
+Optional but recommended — install the git hooks so lint/format run on commit:
+
+```bash
+pip install pre-commit && pre-commit install
+make format        # auto-fix lint + format the whole tree
 ```
 
 ## Style
@@ -33,7 +41,9 @@ make cov           # coverage (keep it ≥ 80%)
 - **Small, focused modules** (200–400 lines typical).
 - **Handle untrusted input safely** — decoders return `[]` rather than raise.
 - **Type hints**, clear names, comments that explain *why*.
-- Run `make test` before opening a PR; add tests for new behaviour.
+- **Linting/formatting** is handled by [ruff](https://docs.astral.sh/ruff/);
+  `make format` fixes most issues and `make lint` is enforced in CI.
+- Run `make lint && make test` before opening a PR; add tests for new behaviour.
 
 ## Writing your own detector
 
@@ -135,5 +145,7 @@ changes are called out in [CHANGELOG.md](CHANGELOG.md).
 
 1. Branch from `main`.
 2. Keep PRs focused; describe the behaviour and include a test plan.
-3. `make test` and `make cov` are green (coverage ≥ 80%).
-4. No network-modifying code (see ground rules).
+3. `make lint`, `make test`, and `make cov` are green (coverage ≥ 80%).
+4. No network-modifying code (see ground rules) — this is enforced by
+   `tests/test_invariant_readonly.py`. If you must cross that line, mark it with
+   `# invariant-ok: <reason>` and explain it in the PR.
