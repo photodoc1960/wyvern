@@ -34,9 +34,16 @@ def test_scenario_detectors_cover_all_stages(tmp_path):
     mon = _monitor(tmp_path)
     mon.feed_events(worm_scenario())
     stages = {a["stage"] for a in mon.recent_alerts(limit=500) if a["stage"]}
-    for expected in ("discovery", "lateral_movement", "credential_reuse",
-                     "ssh_key_injection", "inference_proxy", "beacon_callback",
-                     "idle_device_exec", "worm"):
+    for expected in (
+        "discovery",
+        "lateral_movement",
+        "credential_reuse",
+        "ssh_key_injection",
+        "inference_proxy",
+        "beacon_callback",
+        "idle_device_exec",
+        "worm",
+    ):
         assert expected in stages, f"missing stage {expected}"
 
 
@@ -52,9 +59,12 @@ def test_dashboard_and_export_data(tmp_path):
     assert any(e["worm"] for e in topo["edges"])
 
     out = export_forensic_bundle(
-        str(tmp_path / "f.json"), devices=mon.db.all_devices(),
-        alerts=mon.db.all_alerts(), assessment=mon.current_assessment().to_dict(),
-        generated_at=1.0)
+        str(tmp_path / "f.json"),
+        devices=mon.db.all_devices(),
+        alerts=mon.db.all_alerts(),
+        assessment=mon.current_assessment().to_dict(),
+        generated_at=1.0,
+    )
     data = json.load(open(out))
     assert data["alert_count"] > 0
 

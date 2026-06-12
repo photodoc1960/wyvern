@@ -19,7 +19,7 @@ from ..util.timewindow import KeyedWindows
 from .base import Cooldown, Detector, DetectorContext, clamp01, source_id
 
 SSH_PORT = 22
-_FANOUT_FLOOR = 3   # SSH to >=3 internal hosts is the minimum propagation shape
+_FANOUT_FLOOR = 3  # SSH to >=3 internal hosts is the minimum propagation shape
 
 
 class SshKeyInjectionDetector(Detector):

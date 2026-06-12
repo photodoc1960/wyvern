@@ -8,8 +8,14 @@ from wyvern.models.alert import Alert, Severity
 
 
 def _alert(sev=Severity.CRITICAL):
-    return Alert(detector="beacon", title="Beacon", severity=sev, confidence=0.9,
-                 description="callback", recommendations=("Isolate it",))
+    return Alert(
+        detector="beacon",
+        title="Beacon",
+        severity=sev,
+        confidence=0.9,
+        description="callback",
+        recommendations=("Isolate it",),
+    )
 
 
 def test_build_notifier_none_when_all_disabled():
@@ -21,7 +27,7 @@ def test_below_min_severity_is_silent(monkeypatch):
     calls = []
     n = Notifier(NotifyConfig(min_severity=4))
     monkeypatch.setattr(Notifier, "_desktop", lambda self, a: calls.append(a))
-    n.notify(_alert(Severity.HIGH))     # below Critical threshold -> ignored
+    n.notify(_alert(Severity.HIGH))  # below Critical threshold -> ignored
     assert calls == []
     n.notify(_alert(Severity.CRITICAL))
     assert len(calls) == 1
@@ -57,10 +63,17 @@ def test_email_digest(monkeypatch):
             sent["subject"] = msg["Subject"]
 
     import smtplib
+
     monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
 
-    cfg = NotifyConfig(email_enabled=True, smtp_host="smtp.test", smtp_user="u",
-                       smtp_password="p", email_to=("you@example.com",), min_severity=1)
+    cfg = NotifyConfig(
+        email_enabled=True,
+        smtp_host="smtp.test",
+        smtp_user="u",
+        smtp_password="p",
+        email_to=("you@example.com",),
+        min_severity=1,
+    )
     n = Notifier(cfg)
     n.notify(_alert())
     assert n.maybe_send_digest(10_000.0)

@@ -8,8 +8,7 @@ root privileges.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Union
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +42,7 @@ class ConnEvent:
     src_port: int = 0
     src_mac: str | None = None
     dst_mac: str | None = None
-    flags: str = ""            # TCP flags as letters, e.g. "S", "SA", "RA", "PA"
+    flags: str = ""  # TCP flags as letters, e.g. "S", "SA", "RA", "PA"
     payload_len: int = 0
     ttl: int | None = None
     window: int | None = None
@@ -121,7 +120,7 @@ class DhcpEvent:
     kind = "dhcp"
 
 
-NetworkEvent = Union[ArpEvent, ConnEvent, DnsEvent, HttpEvent, DhcpEvent]
+NetworkEvent = ArpEvent | ConnEvent | DnsEvent | HttpEvent | DhcpEvent
 
 __all__ = [
     "ArpEvent",

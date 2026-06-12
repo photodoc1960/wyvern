@@ -8,11 +8,9 @@ flow is only seen at L3). Records are immutable; each observation produces a new
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
-
 from ..config import Config
 from ..indicators import is_inference_endpoint
-from ..models.device import Device, DeviceRole, GPU_PLAUSIBLE_ROLES
+from ..models.device import GPU_PLAUSIBLE_ROLES, Device, DeviceRole
 from ..models.events import (
     ArpEvent,
     ConnEvent,
@@ -31,7 +29,7 @@ _MAX_DEVICES = 4096
 
 
 class DeviceRegistry:
-    def __init__(self, config: Optional[Config] = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         self.config = config or Config.default()
         self._by_mac: dict[str, Device] = {}
         self._ip_to_mac: dict[str, str] = {}
@@ -43,7 +41,7 @@ class DeviceRegistry:
     def all(self) -> tuple[Device, ...]:
         return tuple(self._by_mac.values())
 
-    def get(self, key: str | None) -> Optional[Device]:
+    def get(self, key: str | None) -> Device | None:
         if not key:
             return None
         norm = normalize_mac(key)
@@ -51,13 +49,13 @@ class DeviceRegistry:
             return self._by_mac[norm]
         return self._by_mac.get(key)
 
-    def get_by_ip(self, ip: str | None) -> Optional[Device]:
+    def get_by_ip(self, ip: str | None) -> Device | None:
         if not ip:
             return None
         mac = self._ip_to_mac.get(ip)
         return self._by_mac.get(mac) if mac else None
 
-    def resolve(self, ip: str | None, mac: str | None) -> Optional[Device]:
+    def resolve(self, ip: str | None, mac: str | None) -> Device | None:
         return self.get(mac) or self.get_by_ip(ip)
 
     # ------------------------------------------------------------- mutation
@@ -69,7 +67,7 @@ class DeviceRegistry:
         self._store(device.evolve(suspicious=value))
         return True
 
-    def observe(self, event: NetworkEvent) -> Optional[Device]:
+    def observe(self, event: NetworkEvent) -> Device | None:
         """Fold one event into the registry; return the source device."""
         if isinstance(event, ArpEvent):
             return self._observe_arp(event)
@@ -84,10 +82,10 @@ class DeviceRegistry:
         return None
 
     # ------------------------------------------------------- event handlers
-    def _observe_arp(self, ev: ArpEvent) -> Optional[Device]:
+    def _observe_arp(self, ev: ArpEvent) -> Device | None:
         return self._upsert(ev.src_mac, ev.src_ip, ev.ts)
 
-    def _observe_conn(self, ev: ConnEvent) -> Optional[Device]:
+    def _observe_conn(self, ev: ConnEvent) -> Device | None:
         ttl = ev.ttl if ev.is_syn or ev.is_synack else None
         src = self._upsert(ev.src_mac, ev.src_ip, ev.ts, ttl=ttl, window=ev.window)
         # A SYN-ACK means the *source* of this packet serves the source port.
@@ -98,13 +96,13 @@ class DeviceRegistry:
             self._upsert(ev.dst_mac, ev.dst_ip, ev.ts)
         return src
 
-    def _observe_http(self, ev: HttpEvent) -> Optional[Device]:
+    def _observe_http(self, ev: HttpEvent) -> Device | None:
         src = self._upsert(ev.src_mac, ev.src_ip, ev.ts, user_agent=ev.user_agent)
         if is_inference_endpoint(ev.host, ev.path, ev.dst_port) and self._internal(ev.dst_ip):
             self._mark_inference_server(ev.dst_ip, ev.ts)
         return src
 
-    def _observe_dhcp(self, ev: DhcpEvent) -> Optional[Device]:
+    def _observe_dhcp(self, ev: DhcpEvent) -> Device | None:
         return self._upsert(ev.src_mac, ev.src_ip, ev.ts, hostname=ev.hostname)
 
     # ------------------------------------------------------------- internals
@@ -115,7 +113,7 @@ class DeviceRegistry:
     def _is_gateway(ip: str | None) -> bool:
         return bool(ip) and (ip.endswith(".1") or ip.endswith(".254"))
 
-    def _key(self, mac: str | None, ip: str | None) -> Optional[str]:
+    def _key(self, mac: str | None, ip: str | None) -> str | None:
         norm = normalize_mac(mac)
         if norm:
             return norm
@@ -156,7 +154,7 @@ class DeviceRegistry:
         window: int | None = None,
         hostname: str | None = None,
         user_agent: str | None = None,
-    ) -> Optional[Device]:
+    ) -> Device | None:
         norm = normalize_mac(mac)
         key = norm
         if key is None:
@@ -177,9 +175,7 @@ class DeviceRegistry:
             if norm and ip and self._ip_to_mac.get(ip, "").startswith("ip:"):
                 device = self._by_mac.pop(self._ip_to_mac[ip], None)
                 if device is not None:
-                    device = device.evolve(
-                        mac=norm, vendor=device.vendor or oui.lookup_vendor(mac)
-                    )
+                    device = device.evolve(mac=norm, vendor=device.vendor or oui.lookup_vendor(mac))
             if device is None:
                 device = Device(
                     mac=key,

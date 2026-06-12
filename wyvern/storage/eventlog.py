@@ -32,7 +32,7 @@ class EventLog:
     def read_all(self) -> list[dict]:
         out: list[dict] = []
         try:
-            with open(self.path, "r", encoding="utf-8") as fh:
+            with open(self.path, encoding="utf-8") as fh:
                 for line in fh:
                     line = line.strip()
                     if not line:

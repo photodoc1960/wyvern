@@ -48,7 +48,9 @@ class CredentialSprayDetector(Detector):
         hosts = hwin.distinct(event.ts)
         if len(hosts) >= self.t.cred_distinct_hosts and self._spray_cool.fire(sid, event.ts):
             confidence = clamp01(
-                0.55 + 0.30 * min(1.0, (len(hosts) - self.t.cred_distinct_hosts) / self.t.cred_distinct_hosts)
+                0.55
+                + 0.30
+                * min(1.0, (len(hosts) - self.t.cred_distinct_hosts) / self.t.cred_distinct_hosts)
             )
             alerts.append(
                 Alert(
@@ -75,10 +77,14 @@ class CredentialSprayDetector(Detector):
         # --- repeated attempts on one host (failed-auth shadow) ---
         rkey = (sid, event.dst_ip, event.dst_port)
         rwin = self._reconnects.add(rkey, event.ts, event.ts)
-        if rwin.count(event.ts) >= self.t.cred_fail_reconnects and self._fail_cool.fire(rkey, event.ts):
+        if rwin.count(event.ts) >= self.t.cred_fail_reconnects and self._fail_cool.fire(
+            rkey, event.ts
+        ):
             tries = rwin.count(event.ts)
             confidence = clamp01(
-                0.40 + 0.30 * min(1.0, (tries - self.t.cred_fail_reconnects) / self.t.cred_fail_reconnects)
+                0.40
+                + 0.30
+                * min(1.0, (tries - self.t.cred_fail_reconnects) / self.t.cred_fail_reconnects)
             )
             target = ctx.registry.get_by_ip(event.dst_ip)
             target_label = target.label if target else event.dst_ip

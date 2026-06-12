@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from typing import Iterable, Optional
 
 from ..models.alert import Alert, Severity
 from ..models.device import Device
@@ -70,9 +69,18 @@ class WyvernDB:
                 "confidence, src_mac, src_ip, dst_ip, dst_port, stage, description, "
                 "recommendations, evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
-                    alert.id, alert.ts, alert.detector, alert.title, int(alert.severity),
-                    alert.confidence, alert.src_mac, alert.src_ip, alert.dst_ip,
-                    alert.dst_port, alert.stage, alert.description,
+                    alert.id,
+                    alert.ts,
+                    alert.detector,
+                    alert.title,
+                    int(alert.severity),
+                    alert.confidence,
+                    alert.src_mac,
+                    alert.src_ip,
+                    alert.dst_ip,
+                    alert.dst_port,
+                    alert.stage,
+                    alert.description,
                     json.dumps(list(alert.recommendations)),
                     json.dumps(dict(alert.evidence)),
                 ),
@@ -86,16 +94,23 @@ class WyvernDB:
                 "os_guess, gpu_capable, suspicious, open_ports, first_seen, last_seen) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (
-                    device.mac, device.ip, device.vendor, device.hostname,
-                    device.role.value, device.os_guess, int(device.gpu_capable),
-                    int(device.suspicious), json.dumps(list(device.open_ports)),
-                    device.first_seen, device.last_seen,
+                    device.mac,
+                    device.ip,
+                    device.vendor,
+                    device.hostname,
+                    device.role.value,
+                    device.os_guess,
+                    int(device.gpu_capable),
+                    int(device.suspicious),
+                    json.dumps(list(device.open_ports)),
+                    device.first_seen,
+                    device.last_seen,
                 ),
             )
             self._conn.commit()
 
     # ------------------------------------------------------------- reads
-    def recent_alerts(self, limit: int = 200, since: Optional[float] = None) -> list[dict]:
+    def recent_alerts(self, limit: int = 200, since: float | None = None) -> list[dict]:
         query = "SELECT * FROM alerts"
         params: list = []
         if since is not None:
@@ -110,8 +125,7 @@ class WyvernDB:
     def alerts_for(self, key: str, limit: int = 200) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT * FROM alerts WHERE src_mac = ? OR src_ip = ? "
-                "ORDER BY ts DESC LIMIT ?",
+                "SELECT * FROM alerts WHERE src_mac = ? OR src_ip = ? ORDER BY ts DESC LIMIT ?",
                 (key, key, limit),
             ).fetchall()
         return [self._alert_row(r) for r in rows]
@@ -123,9 +137,7 @@ class WyvernDB:
 
     def all_devices(self) -> list[dict]:
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM devices ORDER BY last_seen DESC"
-            ).fetchall()
+            rows = self._conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
         return [self._device_row(r) for r in rows]
 
     def stats(self) -> dict:

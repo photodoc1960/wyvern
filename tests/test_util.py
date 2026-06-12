@@ -19,13 +19,16 @@ from wyvern.util.timewindow import (
 )
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ("AA-BB-CC-DD-EE-FF", "aa:bb:cc:dd:ee:ff"),
-    ("aabb.ccdd.eeff", "aa:bb:cc:dd:ee:ff"),
-    (b"\xaa\xbb\xcc\xdd\xee\xff", "aa:bb:cc:dd:ee:ff"),
-    ("not-a-mac", None),
-    (None, None),
-])
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("AA-BB-CC-DD-EE-FF", "aa:bb:cc:dd:ee:ff"),
+        ("aabb.ccdd.eeff", "aa:bb:cc:dd:ee:ff"),
+        (b"\xaa\xbb\xcc\xdd\xee\xff", "aa:bb:cc:dd:ee:ff"),
+        ("not-a-mac", None),
+        (None, None),
+    ],
+)
 def test_normalize_mac(raw, expected):
     assert normalize_mac(raw) == expected
 
@@ -37,8 +40,8 @@ def test_internal_and_usable_ip():
     assert not is_internal_ip("garbage")
     assert is_usable_host_ip("192.168.1.5")
     assert not is_usable_host_ip("255.255.255.255")
-    assert not is_usable_host_ip("224.0.0.1")   # multicast
-    assert not is_usable_host_ip("127.0.0.1")   # loopback
+    assert not is_usable_host_ip("224.0.0.1")  # multicast
+    assert not is_usable_host_ip("127.0.0.1")  # loopback
 
 
 def test_custom_cidrs():

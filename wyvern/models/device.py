@@ -8,7 +8,7 @@ reference always sees a consistent snapshot.
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -31,8 +31,7 @@ class DeviceRole(str, Enum):
 # Devices that should sit quietly: a printer/router/NAS/camera/sensor that
 # suddenly originates code execution or fans out is the worm's replication tell.
 IDLE_ROLES: frozenset[DeviceRole] = frozenset(
-    {DeviceRole.PRINTER, DeviceRole.ROUTER, DeviceRole.NAS,
-     DeviceRole.CAMERA, DeviceRole.IOT}
+    {DeviceRole.PRINTER, DeviceRole.ROUTER, DeviceRole.NAS, DeviceRole.CAMERA, DeviceRole.IOT}
 )
 
 # Roles plausibly equipped with a GPU capable of hosting the worm's LLM.
@@ -52,7 +51,7 @@ class Device:
     os_guess: str | None = None
     open_ports: tuple[int, ...] = ()
     gpu_capable: bool = False
-    suspicious: bool = False        # user-flagged for deeper monitoring
+    suspicious: bool = False  # user-flagged for deeper monitoring
     first_seen: float = 0.0
     last_seen: float = 0.0
 
@@ -65,24 +64,24 @@ class Device:
     def is_idle_role(self) -> bool:
         return self.role in IDLE_ROLES
 
-    def evolve(self, **changes) -> "Device":
+    def evolve(self, **changes) -> Device:
         """Return a new Device with ``changes`` applied (no mutation)."""
         return dataclasses.replace(self, **changes)
 
-    def with_ip(self, ip: str | None, ts: float) -> "Device":
+    def with_ip(self, ip: str | None, ts: float) -> Device:
         if not ip:
             return self.evolve(last_seen=max(self.last_seen, ts))
         # Keep only the most recent handful of IPs (bounds DHCP-churn growth).
         ips = self.ips if ip in self.ips else (*self.ips, ip)[-8:]
         return self.evolve(ip=ip, ips=ips, last_seen=max(self.last_seen, ts))
 
-    def with_open_port(self, port: int) -> "Device":
+    def with_open_port(self, port: int) -> Device:
         if port in self.open_ports:
             return self
         return self.evolve(open_ports=tuple(sorted({*self.open_ports, port})))
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Device":
+    def from_dict(cls, data: dict) -> Device:
         try:
             role = DeviceRole(data.get("role", "unknown"))
         except ValueError:

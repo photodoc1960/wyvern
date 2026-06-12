@@ -28,7 +28,7 @@ def longest_label(domain: str) -> str:
     We deliberately avoid a full public-suffix list (no network/dep); for DGA
     detection the longest label is a good proxy for the random component.
     """
-    labels = [l for l in domain.strip(".").split(".") if l]
+    labels = [lbl for lbl in domain.strip(".").split(".") if lbl]
     if not labels:
         return ""
     # Drop an obvious final TLD label so "x7f3q9zk.com" scores on "x7f3q9zk".

@@ -12,10 +12,19 @@ from wyvern.storage.export import export_alerts_csv, export_forensic_bundle
 
 
 def _alert(**kw):
-    base = dict(detector="beacon", title="Beacon", severity=Severity.CRITICAL,
-                confidence=0.9, description="d", src_ip="192.168.1.30",
-                src_mac="00:80:77:aa:bb:cc", stage="beacon_callback",
-                recommendations=("Isolate it",), evidence={"dst_port": 4444}, ts=10.0)
+    base = {
+        "detector": "beacon",
+        "title": "Beacon",
+        "severity": Severity.CRITICAL,
+        "confidence": 0.9,
+        "description": "d",
+        "src_ip": "192.168.1.30",
+        "src_mac": "00:80:77:aa:bb:cc",
+        "stage": "beacon_callback",
+        "recommendations": ("Isolate it",),
+        "evidence": {"dst_port": 4444},
+        "ts": 10.0,
+    }
     base.update(kw)
     return Alert(**base)
 
@@ -32,8 +41,15 @@ def test_db_insert_and_read():
 
 def test_db_device_and_stats():
     db = WyvernDB(":memory:")
-    db.upsert_device(Device(mac="00:80:77:aa:bb:cc", ip="192.168.1.30",
-                            role=DeviceRole.PRINTER, open_ports=(9100,), suspicious=True))
+    db.upsert_device(
+        Device(
+            mac="00:80:77:aa:bb:cc",
+            ip="192.168.1.30",
+            role=DeviceRole.PRINTER,
+            open_ports=(9100,),
+            suspicious=True,
+        )
+    )
     db.insert_alert(_alert())
     db.insert_alert(_alert(severity=Severity.LOW, id="other"))
     devs = db.all_devices()
@@ -65,7 +81,11 @@ def test_exporters(tmp_path):
     csv_path = export_alerts_csv(str(tmp_path / "a.csv"), alerts)
     assert "beacon" in open(csv_path).read()
     bundle_path = export_forensic_bundle(
-        str(tmp_path / "b.json"), devices=devices, alerts=alerts,
-        assessment={"overall_level_label": "Critical"}, generated_at=1.0)
+        str(tmp_path / "b.json"),
+        devices=devices,
+        alerts=alerts,
+        assessment={"overall_level_label": "Critical"},
+        generated_at=1.0,
+    )
     data = json.load(open(bundle_path))
     assert data["alert_count"] == 1 and data["tool"] == "wyvern"

@@ -11,10 +11,9 @@ from __future__ import annotations
 import logging
 import subprocess
 from collections import deque
-from typing import Optional
 
 from ..config import NotifyConfig
-from ..models.alert import Alert, Severity
+from ..models.alert import Alert
 
 log = logging.getLogger("wyvern.notify")
 
@@ -48,8 +47,10 @@ class Notifier:
         try:
             subprocess.run(
                 ["notify-send", "-a", "Wyvern", title, body],
-                check=False, timeout=5,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=5,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             return True
         except (FileNotFoundError, OSError, subprocess.SubprocessError):
@@ -112,7 +113,7 @@ def _render_digest(alerts: list[Alert]) -> str:
     return "\n".join(lines)
 
 
-def build_notifier(config: NotifyConfig) -> Optional[Notifier]:
+def build_notifier(config: NotifyConfig) -> Notifier | None:
     if not (config.desktop_enabled or config.email_enabled):
         return None
     return Notifier(config)

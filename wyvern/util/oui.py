@@ -156,7 +156,7 @@ def load_oui_file(path: str) -> int:
     """
     added = 0
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("#"):

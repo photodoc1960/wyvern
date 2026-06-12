@@ -32,12 +32,14 @@ def test_email_requires_complete_config():
 
 
 def test_from_dict_ignores_file_secret():
-    cfg = Config.from_dict({
-        "internal_cidrs": ["10.1.0.0/16"],
-        "notify": {"smtp_password": "should-be-ignored", "smtp_host": "x"},
-        "thresholds": {"scan_ports": 25},
-    })
-    assert cfg.notify.smtp_password is None      # never taken from file
+    cfg = Config.from_dict(
+        {
+            "internal_cidrs": ["10.1.0.0/16"],
+            "notify": {"smtp_password": "should-be-ignored", "smtp_host": "x"},
+            "thresholds": {"scan_ports": 25},
+        }
+    )
+    assert cfg.notify.smtp_password is None  # never taken from file
     assert cfg.thresholds.scan_ports == 25
     assert cfg.internal_cidrs == ("10.1.0.0/16",)
 

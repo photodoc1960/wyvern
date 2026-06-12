@@ -30,7 +30,7 @@ dependencies = [
 
 [project.optional-dependencies]
 desktop = ["plyer>=2.1"]
-dev = ["pytest>=7.0", "coverage>=7.0"]
+dev = ["pytest>=7.0", "coverage>=7.0", "ruff>=0.6"]
 
 [project.scripts]
 wyvern = "wyvern.cli:main"
@@ -52,3 +52,24 @@ addopts = "-q"
 [tool.coverage.run]
 source = ["wyvern"]
 omit = ["wyvern/__main__.py"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["build", "dist"]
+
+[tool.ruff.lint]
+# A pragmatic, low-noise baseline: pyflakes (F), pycodestyle (E/W), isort (I),
+# pyupgrade (UP), flake8-bugbear (B), comprehensions (C4), and naming (N).
+select = ["E", "W", "F", "I", "UP", "B", "C4", "N"]
+ignore = [
+  "E501",  # line length is enforced by the formatter, not the linter
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests favour terse fixtures and re-imports; relax naming/bugbear noise there.
+"tests/*" = ["N802", "N803", "N806", "B011"]
+
+[tool.ruff.format]
+quote-style = "double"
+

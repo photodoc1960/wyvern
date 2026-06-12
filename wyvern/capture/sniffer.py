@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 FrameCallback = Callable[[bytes, float], None]
 
@@ -22,9 +22,9 @@ class LiveSniffer:
 
     def __init__(
         self,
-        interface: Optional[str],
+        interface: str | None,
         callback: FrameCallback,
-        bpf_filter: Optional[str] = None,
+        bpf_filter: str | None = None,
     ) -> None:
         self.interface = interface
         self.callback = callback
@@ -35,9 +35,7 @@ class LiveSniffer:
         try:
             from scapy.all import AsyncSniffer  # lazy import
         except ImportError as exc:  # pragma: no cover - environment dependent
-            raise RuntimeError(
-                "scapy is required for live capture (pip install scapy)"
-            ) from exc
+            raise RuntimeError("scapy is required for live capture (pip install scapy)") from exc
 
         self._sniffer = AsyncSniffer(
             iface=self.interface,
@@ -75,7 +73,7 @@ def replay_pcap(
     *,
     realtime: bool = False,
     speed: float = 1.0,
-    limit: Optional[int] = None,
+    limit: int | None = None,
 ) -> int:
     """Replay a pcap/pcapng file through ``callback``. Returns frame count.
 

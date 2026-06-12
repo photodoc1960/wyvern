@@ -19,10 +19,18 @@ def client(tmp_path):
     return create_app(mon).test_client()
 
 
-@pytest.mark.parametrize("ep", [
-    "/api/stats", "/api/devices", "/api/alerts", "/api/topology",
-    "/api/assessment", "/healthz", "/",
-])
+@pytest.mark.parametrize(
+    "ep",
+    [
+        "/api/stats",
+        "/api/devices",
+        "/api/alerts",
+        "/api/topology",
+        "/api/assessment",
+        "/healthz",
+        "/",
+    ],
+)
 def test_endpoints_ok(client, ep):
     assert client.get(ep).status_code == 200
 

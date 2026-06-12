@@ -53,9 +53,9 @@ class LateralMovementDetector(Detector):
             0.55 + 0.25 * min(1.0, (len(peers) - self.t.lateral_peers) / self.t.lateral_peers)
         )
         if role in (DeviceRole.PRINTER, DeviceRole.CAMERA, DeviceRole.NAS, DeviceRole.IOT):
-            confidence = clamp01(confidence + 0.20)   # idle device fanning out
+            confidence = clamp01(confidence + 0.20)  # idle device fanning out
         elif role is DeviceRole.ROUTER:
-            confidence = clamp01(confidence - 0.25)    # routers legitimately fan out
+            confidence = clamp01(confidence - 0.25)  # routers legitimately fan out
         svc_ports = sorted(self._services.get(sid).distinct(event.ts))
         if svc_ports:
             confidence = clamp01(confidence + 0.10)

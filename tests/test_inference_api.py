@@ -9,7 +9,7 @@ from wyvern.detectors.inference_api import InferenceApiDetector
 def test_idle_device_inference_is_critical(config, feed, mk):
     det = InferenceApiDetector(config)
     events = [
-        mk.arp("00:80:77:aa:bb:cc", "192.168.1.30", 1.0),       # printer
+        mk.arp("00:80:77:aa:bb:cc", "192.168.1.30", 1.0),  # printer
         mk.infer("192.168.1.30", "192.168.1.99", 2.0, mac="00:80:77:aa:bb:cc"),
     ]
     alerts = feed(det, events)
@@ -32,6 +32,15 @@ def test_gpu_workstation_not_flagged(config, feed, mk):
 
 def test_non_inference_http_ignored(config, feed, mk):
     det = InferenceApiDetector(config)
-    events = [mk.http("192.168.1.30", "192.168.1.99", 80, 1.0, path="/index.html",
-                      host="site", mac="00:80:77:aa:bb:cc")]
+    events = [
+        mk.http(
+            "192.168.1.30",
+            "192.168.1.99",
+            80,
+            1.0,
+            path="/index.html",
+            host="site",
+            mac="00:80:77:aa:bb:cc",
+        )
+    ]
     assert feed(det, events) == []
