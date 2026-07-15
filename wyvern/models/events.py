@@ -108,6 +108,35 @@ class HttpEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class StreamSegmentEvent:
+    """A single data-bearing TCP segment on a long-lived HTTPS (443) connection.
+
+    Unlike :class:`ConnEvent` (emitted only on SYN/SYN-ACK/RST), this is emitted
+    per data segment so a detector can measure the *inter-packet timing* of a
+    response stream — the passive, metadata-only signal that LLM token streaming
+    leaves through TLS (Alhazbi et al. 2025). It carries **no payload contents**:
+    only a length and a direction. ``to_client`` marks the response direction
+    (server → client, ``src_port`` is the HTTPS port), which is where the
+    autoregressive cadence appears.
+
+    These are high-volume and are routed on a dedicated fast path in the Monitor;
+    they deliberately bypass device tracking, baseline learning and the other
+    detectors (see ``engine/monitor.py``).
+    """
+
+    ts: float
+    src_ip: str
+    dst_ip: str
+    dst_port: int
+    src_port: int
+    payload_len: int
+    to_client: bool = False
+    src_mac: str | None = None
+    dst_mac: str | None = None
+    kind = "stream"
+
+
+@dataclass(frozen=True, slots=True)
 class DhcpEvent:
     """A DHCP request carrying a hostname and/or vendor/parameter fingerprint."""
 
@@ -120,7 +149,7 @@ class DhcpEvent:
     kind = "dhcp"
 
 
-NetworkEvent = ArpEvent | ConnEvent | DnsEvent | HttpEvent | DhcpEvent
+NetworkEvent = ArpEvent | ConnEvent | DnsEvent | HttpEvent | DhcpEvent | StreamSegmentEvent
 
 __all__ = [
     "ArpEvent",
@@ -128,5 +157,6 @@ __all__ = [
     "DnsEvent",
     "HttpEvent",
     "DhcpEvent",
+    "StreamSegmentEvent",
     "NetworkEvent",
 ]

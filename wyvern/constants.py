@@ -155,6 +155,13 @@ STAGE_INFERENCE = "inference_proxy"  # reasoning routed to GPU host
 STAGE_BEACON = "beacon_callback"
 STAGE_REPLICATION = "idle_device_exec"
 
+# A weak, corroborating signal — NOT a worm stage on its own. The stream-timing
+# detector emits this when a long-lived HTTPS response exhibits the inter-packet
+# rhythm of LLM token streaming; the correlator only lets it *reinforce* an
+# existing `inference_proxy` finding, never count as an independent stage (which
+# would let two facets of the same behaviour trip the 2-stage worm verdict).
+STAGE_INFERENCE_TIMING = "inference_timing"
+
 WORM_STAGES: tuple[str, ...] = (
     STAGE_RECON,
     STAGE_LATERAL,

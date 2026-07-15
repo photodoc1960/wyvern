@@ -12,11 +12,12 @@ from .inference_api import InferenceApiDetector
 from .lateral_movement import LateralMovementDetector
 from .port_scan import PortScanDetector
 from .ssh_key_injection import SshKeyInjectionDetector
+from .stream_timing import StreamTimingDetector
 from .worm_signature import WormSignatureCorrelator
 
 
 def default_detectors(config: Config) -> list[Detector]:
-    """The eight per-stage detectors, in a sensible evaluation order."""
+    """The per-stage detectors, in a sensible evaluation order."""
     return [
         PortScanDetector(config),
         LateralMovementDetector(config),
@@ -26,6 +27,7 @@ def default_detectors(config: Config) -> list[Detector]:
         IdleDeviceExecDetector(config),
         BeaconDetector(config),
         DnsAnomalyDetector(config),
+        StreamTimingDetector(config),
     ]
 
 

@@ -14,13 +14,21 @@ window. Crossing the configured stage counts escalates to a HIGH or CRITICAL
 
 from __future__ import annotations
 
-from ..constants import PAPER_REFERENCE, WORM_STAGES
+from ..constants import (
+    PAPER_REFERENCE,
+    STAGE_INFERENCE,
+    STAGE_INFERENCE_TIMING,
+    WORM_STAGES,
+)
 from ..models.alert import Alert, Severity
 from ..models.device import DeviceRole
 from .base import Cooldown, DetectorContext, clamp01
 
 WORM_STAGE_SET = frozenset(WORM_STAGES)
 COMPOSITE_STAGE = "worm"
+# How much a matching token-timing rhythm lifts confidence in an inference-proxy
+# finding when both fire on the same device (Alhazbi et al. 2025 corroboration).
+_TIMING_CORROBORATION_BOOST = 0.15
 
 # Friendly labels for stages in the verdict text.
 _STAGE_LABELS = {
@@ -45,16 +53,26 @@ class WormSignatureCorrelator:
         self.t = config.thresholds
         # key -> {stage: (ts, confidence, detector)}
         self._stages: dict[str, dict[str, tuple[float, float, str]]] = {}
+        # key -> ts of the last token-timing corroboration signal (a weak hint
+        # that is *not* an independent worm stage; see :meth:`_maybe_corroborate`)
+        self._timing: dict[str, float] = {}
         self._last_count: dict[str, int] = {}
         self._cool = Cooldown(self.t.worm_window_s / 2.0)
+        self._corrob_cool = Cooldown(self.t.worm_window_s / 2.0)
 
     def correlate(self, alerts: list[Alert], ctx: DetectorContext, now: float) -> list[Alert]:
         touched: set[str] = set()
         for alert in alerts:
-            if alert.stage not in WORM_STAGE_SET:
-                continue
             key = alert.src_mac or alert.src_ip
             if not key:
+                continue
+            if alert.stage == STAGE_INFERENCE_TIMING:
+                # Weak corroborating hint — recorded on the side, never counted
+                # as one of the distinct worm stages.
+                self._timing[key] = alert.ts or now
+                touched.add(key)
+                continue
+            if alert.stage not in WORM_STAGE_SET:
                 continue
             self._stages.setdefault(key, {})[alert.stage] = (
                 alert.ts or now,
@@ -66,6 +84,9 @@ class WormSignatureCorrelator:
         out: list[Alert] = []
         for key in touched:
             self._prune(key, now)
+            corrob = self._maybe_corroborate(key, ctx, now)
+            if corrob is not None:
+                out.append(corrob)
             stages = self._stages.get(key, {})
             count = len(stages)
             if count < self.t.worm_stages_high:
@@ -90,8 +111,54 @@ class WormSignatureCorrelator:
         self._prune(key, now)
         return sorted(self._stages.get(key, {}).keys())
 
+    def _maybe_corroborate(self, key: str, ctx: DetectorContext, now: float) -> Alert | None:
+        """When a device shows *both* an inference-proxy finding and the token-
+        timing rhythm within the window, emit a single boosted corroboration
+        alert. This is the "raise confidence when both fire" path: the timing
+        signal reinforces the existing detection rather than acting alone.
+        """
+        timing_ts = self._timing.get(key)
+        if timing_ts is None or (now - timing_ts) > self.t.worm_window_s:
+            return None
+        inference = self._stages.get(key, {}).get(STAGE_INFERENCE)
+        if inference is None:
+            return None
+        if not self._corrob_cool.fire(("corroborate", key), now):
+            return None
+        _inf_ts, inf_conf, _inf_det = inference
+        confidence = clamp01(inf_conf + _TIMING_CORROBORATION_BOOST)
+        device = ctx.registry.get(key) or ctx.registry.get_by_ip(key)
+        label = device.label if device else key
+        role = device.role.value if device else DeviceRole.UNKNOWN.value
+        return Alert(
+            detector="stream_timing",
+            title=f"LLM inference over encrypted HTTPS corroborated on {label}",
+            severity=Severity.from_confidence(confidence),
+            confidence=confidence,
+            stage=STAGE_INFERENCE,
+            description=(
+                f"{label} ({role}) produced an inference-proxy signal *and* a matching "
+                "token-streaming timing rhythm on encrypted HTTPS. Two independent passive "
+                "signals — port/URL and inter-packet cadence (Alhazbi et al. 2025) — now "
+                "point at the same device routing LLM inference, raising confidence beyond "
+                "either signal alone. No payload was decrypted."
+            ),
+            src_mac=device.mac if device else (key if ":" in str(key) else None),
+            src_ip=device.ip if device else (key if "." in str(key) else None),
+            ts=now,
+            evidence={
+                "corroborating_signals": ["inference_api", "stream_timing"],
+                "base_confidence": round(inf_conf, 3),
+                "boosted_confidence": round(confidence, 3),
+                "reference": "Alhazbi et al. 2025, IEEE OJ-COMS",
+            },
+        )
+
     def _prune(self, key: str, now: float) -> None:
         horizon = now - self.t.worm_window_s
+        timing_ts = self._timing.get(key)
+        if timing_ts is not None and timing_ts < horizon:
+            self._timing.pop(key, None)
         bucket = self._stages.get(key)
         if not bucket:
             return
