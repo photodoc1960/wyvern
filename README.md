@@ -123,9 +123,21 @@ pure and fully unit-tested.
 | `credential_spray` | **credential reuse across hosts** (§5) | auth (SSH/SMB/RDP/WinRM) to many hosts, or rapid retries |
 | `ssh_key_injection` | **SSH public-key injection** (§5) | SSH fan-out from an idle / never-SSH device |
 | `inference_api` | **reasoning proxy** (Fig. 1) | LLM inference (`/v1/chat/completions`, vLLM/ollama ports) **from a non-GPU device** |
+| `stream_timing` | **reasoning proxy over encrypted HTTPS** | a long-lived 443 response stream to a non-GPU device shows the inter-packet **token-streaming rhythm** — a weak corroborating hint, timing metadata only |
 | `beacon` | **beacon callbacks on non-standard ports** (§5) | regular low-jitter callbacks to a non-standard port |
 | `idle_exec` | **self-replication / code exec** | a printer/router/NAS/camera starts **originating** connections |
 | `dns_anomaly` | C2 lookups | query spikes, NXDOMAIN bursts, DGA-looking domains |
+
+`stream_timing` closes the gap where a worm routes its reasoning proxy over standard
+HTTPS to an external API — port 443, encrypted, so `inference_api`'s port/URL matching
+sees nothing. Following Alhazbi et al. (2025, IEEE OJ-COMS), it passively measures the
+inter-packet cadence LLM autoregressive generation leaves on the streamed response
+(**no TLS interception, no payload inspected**). It never alerts on its own: the
+`worm_signature` correlator only lets the rhythm *raise confidence* in an
+`inference_api` finding for the same device. Defaults are deliberately conservative to
+avoid false positives on ordinary long-lived HTTPS (video, downloads, websockets). This
+addresses the "`inference_api` blind to LLM inference routed over HTTPS" limitation in
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 ### The composite signature
 

@@ -14,6 +14,7 @@ from wyvern.models.events import (
     DhcpEvent,
     DnsEvent,
     HttpEvent,
+    StreamSegmentEvent,
 )
 from wyvern.tracking.registry import DeviceRegistry
 
@@ -104,6 +105,18 @@ def mk():
     def dhcp(mac, ip, ts, *, hostname=None):
         return DhcpEvent(ts=ts, src_mac=mac, src_ip=ip, hostname=hostname)
 
+    def stream(client, server, ts, *, size=200, to_client=True, cport=51000):
+        """A data-bearing HTTPS response segment (server:443 -> client)."""
+        return StreamSegmentEvent(
+            ts=ts,
+            src_ip=server,
+            dst_ip=client,
+            dst_port=cport,
+            src_port=443,
+            payload_len=size,
+            to_client=to_client,
+        )
+
     return SimpleNamespace(
         syn=syn,
         synack=synack,
@@ -115,6 +128,7 @@ def mk():
         http=http,
         infer=infer,
         dhcp=dhcp,
+        stream=stream,
     )
 
 

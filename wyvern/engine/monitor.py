@@ -29,8 +29,9 @@ from ..capture.decode import decode_frame
 from ..config import Config
 from ..detectors.base import DetectorContext
 from ..detectors.loader import default_detectors, make_correlator
+from ..detectors.stream_timing import StreamTimingDetector
 from ..models.alert import Alert, Severity
-from ..models.events import ConnEvent, NetworkEvent
+from ..models.events import ConnEvent, NetworkEvent, StreamSegmentEvent
 from ..storage.db import WyvernDB
 from ..storage.eventlog import EventLog
 from ..tracking.registry import DeviceRegistry
@@ -56,6 +57,12 @@ class Monitor:
         self.registry = DeviceRegistry(config)
         self.baseline = BaselineLearner(config)
         self.detectors = default_detectors(config)
+        # Direct handle for the high-volume stream-timing fast path (see
+        # ``_process_locked``); it also lives in ``self.detectors`` so its
+        # periodic ``sweep`` runs with the others.
+        self._stream_timing = next(
+            (d for d in self.detectors if isinstance(d, StreamTimingDetector)), None
+        )
         self.correlator = make_correlator(config)
         self.assessor = ThreatAssessor(config)
         self.db = db if db is not None else WyvernDB(config.db_path)
@@ -93,6 +100,16 @@ class Monitor:
 
     def _process_locked(self, event: NetworkEvent) -> list[Alert]:
         self.event_count += 1
+        # Stream segments are high-volume, payload-free timing samples. They take
+        # a dedicated fast path straight to the stream-timing detector, bypassing
+        # device tracking, baseline learning, edge tracking and the other
+        # detectors — none of which want per-packet events. Alerts (if any) come
+        # later, from that detector's periodic sweep.
+        if isinstance(event, StreamSegmentEvent):
+            if self._stream_timing is not None:
+                ctx = DetectorContext(self.config, self.registry, self.baseline, now=event.ts)
+                self._stream_timing.inspect(event, ctx)
+            return []
         self.registry.observe(event)
         if self.learn:
             self.baseline.observe(event, self.registry)

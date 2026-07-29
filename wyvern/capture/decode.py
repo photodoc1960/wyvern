@@ -22,6 +22,7 @@ from ..models.events import (
     DnsEvent,
     HttpEvent,
     NetworkEvent,
+    StreamSegmentEvent,
 )
 
 # DNS-like UDP ports we parse as DNS (53) or multicast DNS (5353).
@@ -29,6 +30,8 @@ _DNS_PORTS = {53, 5353}
 _DHCP_PORTS = {67, 68}
 # Ports where we attempt cleartext HTTP request parsing.
 _HTTP_HINT_PORTS = {80, 631, 3000, 5000, 8000, 8080, 8081, 8161, 8888, 9100, 10000}
+# HTTPS ports whose data segments we surface for passive stream-timing analysis.
+_STREAM_PORTS = {443}
 
 
 def _mac_to_str(raw: bytes) -> str:
@@ -130,10 +133,28 @@ def _decode_tcp(
     payload = bytes(tcp.data) if tcp.data else b""
     events: list[NetworkEvent] = []
 
+    dport, sport = int(tcp.dport), int(tcp.sport)
+
     if payload:
-        app = _parse_http_or_tls(payload, ts, src_ip, dst_ip, int(tcp.dport), src_mac)
+        app = _parse_http_or_tls(payload, ts, src_ip, dst_ip, dport, src_mac)
         if app is not None:
             events.append(app)
+        # Surface data-bearing HTTPS segments (metadata only) so the stream-timing
+        # detector can measure inter-packet cadence on the response direction.
+        if dport in _STREAM_PORTS or sport in _STREAM_PORTS:
+            events.append(
+                StreamSegmentEvent(
+                    ts=ts,
+                    src_ip=src_ip,
+                    dst_ip=dst_ip,
+                    dst_port=dport,
+                    src_port=sport,
+                    payload_len=len(payload),
+                    to_client=sport in _STREAM_PORTS,
+                    src_mac=src_mac,
+                    dst_mac=dst_mac,
+                )
+            )
 
     is_syn = ("S" in flags) and ("A" not in flags)
     is_synack = ("S" in flags) and ("A" in flags)

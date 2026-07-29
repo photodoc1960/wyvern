@@ -7,7 +7,14 @@ import socket
 import dpkt
 
 from wyvern.capture.decode import decode_frame
-from wyvern.models.events import ArpEvent, ConnEvent, DhcpEvent, DnsEvent, HttpEvent
+from wyvern.models.events import (
+    ArpEvent,
+    ConnEvent,
+    DhcpEvent,
+    DnsEvent,
+    HttpEvent,
+    StreamSegmentEvent,
+)
 
 SMAC = b"\xaa\xbb\xcc\x00\x11\x22"
 DMAC = b"\x00\x11\x22\x33\x44\x55"
@@ -73,6 +80,26 @@ def test_decode_dhcp_hostname():
     evs = decode_frame(_eth(ip, dpkt.ethernet.ETH_TYPE_IP), 1.0)
     dh = [e for e in evs if isinstance(e, DhcpEvent)][0]
     assert dh.hostname == "my-printer" and dh.param_list == (1, 3, 6)
+
+
+def test_decode_https_data_yields_stream_segment():
+    # A data-bearing segment FROM :443 is a response-direction timing sample.
+    tcp = dpkt.tcp.TCP(
+        sport=443, dport=51000, flags=dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK, data=b"x" * 120
+    )
+    ip = dpkt.ip.IP(src=B, dst=A, p=dpkt.ip.IP_PROTO_TCP, ttl=64, data=tcp)
+    evs = decode_frame(_eth(ip, dpkt.ethernet.ETH_TYPE_IP), 1.0)
+    seg = [e for e in evs if isinstance(e, StreamSegmentEvent)][0]
+    assert seg.src_port == 443 and seg.to_client is True and seg.payload_len == 120
+
+
+def test_decode_https_syn_has_no_stream_segment():
+    # A bare SYN carries no payload -> ConnEvent only, no timing sample.
+    tcp = dpkt.tcp.TCP(sport=51000, dport=443, flags=dpkt.tcp.TH_SYN, win=64240)
+    ip = dpkt.ip.IP(src=A, dst=B, p=dpkt.ip.IP_PROTO_TCP, ttl=64, data=tcp)
+    evs = decode_frame(_eth(ip, dpkt.ethernet.ETH_TYPE_IP), 1.0)
+    assert any(isinstance(e, ConnEvent) for e in evs)
+    assert not any(isinstance(e, StreamSegmentEvent) for e in evs)
 
 
 def test_decode_udp_generic():

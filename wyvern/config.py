@@ -38,6 +38,19 @@ class Thresholds:
     # Inference proxy: inference requests/min from a single device.
     inference_rate_per_min: float = 6.0
     inference_window_s: float = 300.0
+    # Stream-timing corroboration: passive detection of LLM token streaming over
+    # HTTPS by the inter-packet rhythm of the response (Alhazbi et al. 2025).
+    # A *corroborating* hint only — deliberately conservative to avoid firing on
+    # ordinary long-lived 443 (video, downloads, websockets, keep-alives).
+    stream_timing_ports: tuple[int, ...] = (443,)
+    stream_timing_window_s: float = 120.0
+    stream_timing_min_segments: int = 40  # need a sustained stream, not a burst
+    stream_timing_min_gap_ms: float = 8.0  # faster ⇒ bulk transfer, not tokens
+    stream_timing_max_gap_ms: float = 120.0  # slower ⇒ interactive, not streaming
+    stream_timing_cov_lo: float = 0.10  # too regular ⇒ CBR media pacing
+    stream_timing_cov_hi: float = 1.20  # too erratic ⇒ bursty web traffic
+    stream_timing_max_payload_mean: float = 800.0  # token chunks are small
+    stream_timing_confidence: float = 0.30  # standalone weak signal
     # Beaconing: regular callbacks on a non-standard port.
     beacon_min_callbacks: int = 6
     beacon_window_s: float = 1800.0
@@ -62,6 +75,7 @@ class Thresholds:
             "idle_outbound_conns",
             "worm_stages_high",
             "worm_stages_critical",
+            "stream_timing_min_segments",
         ):
             if getattr(self, name) <= 0:
                 raise ConfigError(f"threshold '{name}' must be positive")
@@ -74,6 +88,7 @@ class Thresholds:
             "beacon_window_s",
             "idle_window_s",
             "worm_window_s",
+            "stream_timing_window_s",
         ):
             if getattr(self, name) <= 0:
                 raise ConfigError(f"window '{name}' must be positive")
@@ -83,6 +98,16 @@ class Thresholds:
             raise ConfigError("beacon_max_cov must be in (0, 1]")
         if self.worm_stages_critical < self.worm_stages_high:
             raise ConfigError("worm_stages_critical must be >= worm_stages_high")
+        if not self.stream_timing_ports:
+            raise ConfigError("stream_timing_ports must not be empty")
+        if not (0.0 < self.stream_timing_min_gap_ms < self.stream_timing_max_gap_ms):
+            raise ConfigError("stream_timing gap bounds must satisfy 0 < min < max")
+        if not (0.0 <= self.stream_timing_cov_lo < self.stream_timing_cov_hi):
+            raise ConfigError("stream_timing cov bounds must satisfy 0 <= lo < hi")
+        if self.stream_timing_max_payload_mean <= 0:
+            raise ConfigError("stream_timing_max_payload_mean must be positive")
+        if not (0.0 < self.stream_timing_confidence <= 1.0):
+            raise ConfigError("stream_timing_confidence must be in (0, 1]")
 
 
 @dataclass(frozen=True, slots=True)
