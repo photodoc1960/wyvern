@@ -98,10 +98,16 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _new_monitor(cfg: Config, *, learn: bool = True):
+    from .alerting.enforcement import build_bridge
     from .alerting.notifier import build_notifier
     from .engine.monitor import Monitor
 
-    return Monitor(cfg, learn=learn, notifier=build_notifier(cfg.notify))
+    return Monitor(
+        cfg,
+        learn=learn,
+        notifier=build_notifier(cfg.notify),
+        bridge=build_bridge(cfg.enforce),
+    )
 
 
 def _cmd_monitor(cfg: Config, args) -> int:
