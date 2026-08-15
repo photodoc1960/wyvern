@@ -48,6 +48,7 @@ class Monitor:
         *,
         learn: bool = True,
         notifier=None,
+        bridge=None,
         bus: EventBus | None = None,
         db: WyvernDB | None = None,
         eventlog: EventLog | None = None,
@@ -69,6 +70,7 @@ class Monitor:
         self.eventlog = eventlog if eventlog is not None else EventLog(config.eventlog_path)
         self.bus = bus if bus is not None else EventBus()
         self.notifier = notifier
+        self.bridge = bridge
         self.learn = learn
 
         self._recent_alerts: deque[Alert] = deque(maxlen=5000)
@@ -179,6 +181,11 @@ class Monitor:
                 self.notifier.notify(alert, device)
             except Exception:  # noqa: BLE001
                 log.debug("notifier error", exc_info=True)
+        if self.bridge is not None:
+            try:
+                self.bridge.dispatch(alert)
+            except Exception:  # noqa: BLE001 - enforcement must not affect the pipeline
+                log.debug("enforcement error", exc_info=True)
         if alert.severity >= Severity.HIGH:
             log.warning("[%s] %s", alert.severity.label, alert.title)
 

@@ -146,6 +146,36 @@ class NotifyConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class EnforceConfig:
+    """Detection->enforcement bridge (issue #22, Piece 2).
+
+    Wyvern stays passive: on a high-confidence alert it POSTs a signed finding to
+    an EXTERNAL actuator (firewall / egress controller) that decides whether to
+    act. Off by default. The signing secret is injected from the environment only
+    (``WYVERN_ENFORCE_SECRET``), never read from the YAML file, per the project's
+    secret-management rules.
+    """
+
+    enabled: bool = False
+    webhook_url: str | None = None
+    min_severity: int = 4  # CRITICAL only, by default
+    timeout_s: float = 5.0
+    signing_secret: str | None = None  # injected from env only
+
+    def validate(self) -> None:
+        if not self.enabled:
+            return
+        if not self.webhook_url:
+            raise ConfigError("enforcement enabled but webhook_url is unset")
+        if not (self.webhook_url.startswith(("http://", "https://"))):
+            raise ConfigError("enforce.webhook_url must be an http(s) URL")
+        if not (1 <= self.min_severity <= 4):
+            raise ConfigError("enforce.min_severity must be 1..4")
+        if self.timeout_s <= 0:
+            raise ConfigError("enforce.timeout_s must be positive")
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     interface: str | None = None
     internal_cidrs: tuple[str, ...] = DEFAULT_PRIVATE_CIDRS
@@ -164,6 +194,7 @@ class Config:
     oui_file: str | None = None
     thresholds: Thresholds = field(default_factory=Thresholds)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
+    enforce: EnforceConfig = field(default_factory=EnforceConfig)
 
     # ---- derived paths ----
     @property
@@ -199,6 +230,7 @@ class Config:
                 raise ConfigError(f"invalid internal CIDR {cidr!r}: {exc}") from exc
         self.thresholds.validate()
         self.notify.validate()
+        self.enforce.validate()
         return self
 
     # ---- constructors ----
@@ -215,10 +247,13 @@ class Config:
         if "email_to" in notify_raw and isinstance(notify_raw["email_to"], list):
             notify_raw["email_to"] = tuple(notify_raw["email_to"])
         notify = NotifyConfig(**notify_raw)
+        enforce_raw = dict(data.pop("enforce", {}) or {})
+        enforce_raw.pop("signing_secret", None)  # never accept secrets from file
+        enforce = EnforceConfig(**enforce_raw)
         for seq_key in ("internal_cidrs", "gpu_hosts", "no_egress_hosts"):
             if seq_key in data and isinstance(data[seq_key], list):
                 data[seq_key] = tuple(data[seq_key])
-        cfg = cls(thresholds=thresholds, notify=notify, **data)
+        cfg = cls(thresholds=thresholds, notify=notify, enforce=enforce, **data)
         cfg = cfg._with_env_overrides()
         return cfg.validate()
 
@@ -246,6 +281,10 @@ class Config:
         pw = os.environ.get("WYVERN_SMTP_PASSWORD")
         if pw:
             notify = replace(notify, smtp_password=pw)
+        enforce = self.enforce
+        secret = os.environ.get("WYVERN_ENFORCE_SECRET")
+        if secret:
+            enforce = replace(enforce, signing_secret=secret)
         web_port = self.web_port
         port_env = os.environ.get("WYVERN_WEB_PORT")
         if port_env:
@@ -256,6 +295,7 @@ class Config:
         return replace(
             self,
             notify=notify,
+            enforce=enforce,
             interface=os.environ.get("WYVERN_INTERFACE") or self.interface,
             data_dir=os.environ.get("WYVERN_DATA_DIR") or self.data_dir,
             web_host=os.environ.get("WYVERN_WEB_HOST") or self.web_host,
