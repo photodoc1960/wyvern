@@ -173,5 +173,12 @@ WORM_STAGES: tuple[str, ...] = (
     STAGE_REPLICATION,
 )
 
+# Unexpected egress from a host declared to have *none* (an isolated/quarantined
+# segment). A standalone high-confidence tripwire for a containment escape — the
+# network-layer signal of the 2026-07 autonomous sandbox-escape class (issue #22).
+# Deliberately NOT in WORM_STAGES: it stands on its own and must not perturb the
+# correlator's stage-count verdict. Correlator integration is deferred.
+STAGE_EGRESS = "unexpected_egress"
+
 # Human-readable paper reference attached to worm-signature alerts.
 PAPER_REFERENCE = "Guan et al., 'AI Agents Enable Adaptive Computer Worms', arXiv:2606.03811 (2026)"

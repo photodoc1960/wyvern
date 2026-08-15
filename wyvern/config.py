@@ -59,6 +59,10 @@ class Thresholds:
     # Idle-device code execution (printer/router/NAS suddenly active).
     idle_outbound_conns: int = 3
     idle_window_s: float = 600.0
+    # Zero-egress: a host declared no-egress reaching an external network. The
+    # window re-arms the per-destination alert so a persistent violation re-surfaces.
+    no_egress_window_s: float = 3600.0
+    no_egress_confidence: float = 0.9  # containment escape => high confidence
     # Composite worm signature: distinct stages within the correlation window.
     worm_stages_high: int = 2
     worm_stages_critical: int = 3
@@ -89,9 +93,12 @@ class Thresholds:
             "idle_window_s",
             "worm_window_s",
             "stream_timing_window_s",
+            "no_egress_window_s",
         ):
             if getattr(self, name) <= 0:
                 raise ConfigError(f"window '{name}' must be positive")
+        if not (0.0 < self.no_egress_confidence <= 1.0):
+            raise ConfigError("no_egress_confidence must be in (0, 1]")
         if not (0.0 < self.dga_score <= 1.0):
             raise ConfigError("dga_score must be in (0, 1]")
         if not (0.0 < self.beacon_max_cov <= 1.0):
@@ -144,6 +151,10 @@ class Config:
     internal_cidrs: tuple[str, ...] = DEFAULT_PRIVATE_CIDRS
     bpf_filter: str | None = None
     gpu_hosts: tuple[str, ...] = ()  # IPs or MACs declared GPU-capable
+    # IPs or MACs of hosts that must have NO external egress (isolated/quarantined
+    # segments). Any outbound to an external network from these is a high-confidence
+    # containment-escape signal. Empty => the zero-egress detector is inert.
+    no_egress_hosts: tuple[str, ...] = ()
     learning_window_hours: float = 24.0
     data_dir: str = "./wyvern-data"
     web_enabled: bool = True
@@ -204,7 +215,7 @@ class Config:
         if "email_to" in notify_raw and isinstance(notify_raw["email_to"], list):
             notify_raw["email_to"] = tuple(notify_raw["email_to"])
         notify = NotifyConfig(**notify_raw)
-        for seq_key in ("internal_cidrs", "gpu_hosts"):
+        for seq_key in ("internal_cidrs", "gpu_hosts", "no_egress_hosts"):
             if seq_key in data and isinstance(data[seq_key], list):
                 data[seq_key] = tuple(data[seq_key])
         cfg = cls(thresholds=thresholds, notify=notify, **data)
@@ -256,3 +267,9 @@ class Config:
             return False
         targets = {t.lower() for t in self.gpu_hosts}
         return (ip and ip.lower() in targets) or (mac and mac.lower() in targets)
+
+    def is_no_egress_host(self, ip: str | None, mac: str | None) -> bool:
+        if not self.no_egress_hosts:
+            return False
+        targets = {t.lower() for t in self.no_egress_hosts}
+        return bool((ip and ip.lower() in targets) or (mac and mac.lower() in targets))
