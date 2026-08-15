@@ -60,6 +60,7 @@ from ..models.events import ConnEvent, NetworkEvent
 from ..util.timewindow import KeyedWindows
 from .base import Cooldown, Detector, DetectorContext, clamp01, source_id
 
+
 class SmbV1Detector(Detector):
     name = "smbv1"
 
@@ -79,14 +80,21 @@ class SmbV1Detector(Detector):
             return []
         device = ctx.device_for(event)
         conf = clamp01(0.5 + 0.1 * len(hosts))
-        return [Alert(
-            detector=self.name, title=f"SMB sweep to {len(hosts)} hosts (EternalBlue/SambaCry)",
-            severity=Severity.from_confidence(conf), confidence=conf, stage=STAGE_EXPLOIT,
-            description=f"{device.label if device else event.src_ip} probed SMB on "
-                        f"{len(hosts)} hosts — worm foothold attempt.",
-            src_mac=device.mac if device else event.src_mac, src_ip=event.src_ip,
-            ts=event.ts, evidence={"smb_targets": sorted(hosts)[:20]},
-        )]
+        return [
+            Alert(
+                detector=self.name,
+                title=f"SMB sweep to {len(hosts)} hosts (EternalBlue/SambaCry)",
+                severity=Severity.from_confidence(conf),
+                confidence=conf,
+                stage=STAGE_EXPLOIT,
+                description=f"{device.label if device else event.src_ip} probed SMB on "
+                f"{len(hosts)} hosts — worm foothold attempt.",
+                src_mac=device.mac if device else event.src_mac,
+                src_ip=event.src_ip,
+                ts=event.ts,
+                evidence={"smb_targets": sorted(hosts)[:20]},
+            )
+        ]
 ```
 
 **2. Register it in `wyvern/detectors/loader.py`** (add to the `default_detectors`
@@ -97,10 +105,13 @@ list).
 ```python
 from wyvern.detectors.smbv1 import SmbV1Detector
 
+
 def test_smb_sweep(config, feed, mk):
     det = SmbV1Detector(config)
-    events = [mk.syn("192.168.1.50", f"192.168.1.{h}", 445, 1.0 + h,
-                     mac="00:14:22:00:00:50") for h in range(10, 14)]
+    events = [
+        mk.syn("192.168.1.50", f"192.168.1.{h}", 445, 1.0 + h, mac="00:14:22:00:00:50")
+        for h in range(10, 14)
+    ]
     assert feed(det, events)
 ```
 

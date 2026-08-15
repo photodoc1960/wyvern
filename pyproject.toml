@@ -30,7 +30,9 @@ dependencies = [
 
 [project.optional-dependencies]
 desktop = ["plyer>=2.1"]
-dev = ["pytest>=7.0", "coverage>=7.0", "ruff>=0.6"]
+# ruff is pinned exactly: its formatter output changes between releases (0.16 began
+# formatting Python code blocks in Markdown), so an unpinned floor silently red-Xes CI.
+dev = ["pytest>=7.0", "coverage>=7.0", "ruff==0.16.1"]
 
 [project.scripts]
 wyvern = "wyvern.cli:main"
