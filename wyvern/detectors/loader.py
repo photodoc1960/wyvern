@@ -14,6 +14,7 @@ from .port_scan import PortScanDetector
 from .ssh_key_injection import SshKeyInjectionDetector
 from .stream_timing import StreamTimingDetector
 from .worm_signature import WormSignatureCorrelator
+from .zero_egress import ZeroEgressDetector
 
 
 def default_detectors(config: Config) -> list[Detector]:
@@ -28,6 +29,7 @@ def default_detectors(config: Config) -> list[Detector]:
         BeaconDetector(config),
         DnsAnomalyDetector(config),
         StreamTimingDetector(config),
+        ZeroEgressDetector(config),
     ]
 
 
