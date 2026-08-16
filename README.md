@@ -194,8 +194,17 @@ wyvern -c config.yaml <command>        # use a config file
 
 Copy [`config.example.yaml`](config.example.yaml), edit, and pass with `-c`. You
 can declare known `gpu_hosts` (to silence inference false-positives), tune every
-threshold, set `internal_cidrs`, and configure alerting. **Secrets never live in
-the file** — the SMTP password is read only from `WYVERN_SMTP_PASSWORD`.
+threshold, set `internal_cidrs`, and configure alerting. Two containment-focused
+settings are **off by default**:
+
+- `no_egress_hosts` — declare isolated/quarantined hosts (IPs or MACs) that must
+  never reach an external network; any egress fires a high-confidence alert.
+- `enforce` — when enabled, high-confidence alerts are POSTed (HMAC-signed) to an
+  **external** actuator (firewall/egress controller) that can cut the flow. Wyvern
+  stays passive; it only hands off a signed finding — it never blocks packets.
+
+**Secrets never live in the file** — the SMTP password and the enforcement signing
+secret are read only from `WYVERN_SMTP_PASSWORD` and `WYVERN_ENFORCE_SECRET`.
 
 ## Architecture
 
