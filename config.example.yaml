@@ -19,6 +19,13 @@ bpf_filter: null
 # Listing them suppresses false "inference from non-GPU device" alerts.
 gpu_hosts: []          # e.g. ["192.168.1.99", "00:04:4b:aa:bb:cc"]
 
+# Hosts (IPs or MACs) that must have NO external egress — an isolated,
+# quarantined or air-gapped segment. Any outbound to an external network from
+# one of these fires a high-confidence "unexpected egress" alert (the zero-egress
+# detector). Empty = the detector is inert (off by default). This is a tripwire
+# BEHIND real egress controls (firewall default-deny), not a replacement for them.
+no_egress_hosts: []    # e.g. ["192.168.1.77", "00:14:22:aa:bb:cc"]
+
 # How long to learn each device's normal behaviour before trusting the baseline.
 learning_window_hours: 24
 
@@ -57,6 +64,8 @@ thresholds:
   beacon_min_interval_s: 2
   idle_outbound_conns: 3    # idle device originating >N flows -> code execution
   idle_window_s: 600
+  no_egress_window_s: 3600  # re-arm window for a repeated egress from a no_egress_host
+  no_egress_confidence: 0.9 # 0..1 confidence of an unexpected-egress alert (=> CRITICAL)
   worm_stages_high: 2       # distinct worm stages -> HIGH composite verdict
   worm_stages_critical: 3   # distinct worm stages -> CRITICAL composite verdict
   worm_window_s: 3600
@@ -73,3 +82,17 @@ notify:
   email_from: null
   email_to: []              # e.g. ["you@example.com"]
   email_digest_min_s: 3600
+
+# ----- Detection -> enforcement bridge -----
+# OFF by default. When enabled, a high-confidence alert is POSTed (JSON) to an
+# EXTERNAL actuator (firewall / egress controller / quarantine hook) that decides
+# whether to act. Wyvern itself stays passive — it never blocks packets; it only
+# hands off a signed finding. The signing secret is read from the environment
+# (WYVERN_ENFORCE_SECRET), NEVER from this file.
+enforce:
+  enabled: false
+  webhook_url: null         # http(s) endpoint of your actuator, e.g. "https://gw.lan/quarantine"
+  min_severity: 4           # only dispatch at/above this severity (1=Low..4=Critical)
+  timeout_s: 5              # POST timeout; a slow/broken actuator is logged, never fatal
+  # signing_secret is NEVER read from this file — set WYVERN_ENFORCE_SECRET in the env.
+  # When set, the body is HMAC-SHA256 signed in the X-Wyvern-Signature header.
