@@ -193,6 +193,12 @@ class ResponsePolicy:
     max_actions_per_window: int = 5  # circuit breaker: max actions per window
     window_s: float = 300.0
     quarantine_ttl_s: float = 3600.0  # auto-expiry / auto-release horizon
+    # Responder that actually enforces a quarantine. "none" (default) => the engine
+    # only proposes/records, never enforces. "firewall" runs the operator-supplied
+    # command templates below (with {ip}/{mac} substituted; no shell).
+    responder: str = "none"  # none | firewall
+    firewall_quarantine_cmd: str | None = None
+    firewall_release_cmd: str | None = None
 
     def validate(self) -> None:
         if self.mode not in ("observe", "confirm", "auto"):
@@ -204,6 +210,15 @@ class ResponsePolicy:
         for name in ("window_s", "quarantine_ttl_s"):
             if getattr(self, name) <= 0:
                 raise ConfigError(f"response.{name} must be positive")
+        if self.responder not in ("none", "firewall"):
+            raise ConfigError("response.responder must be 'none' or 'firewall'")
+        if self.responder == "firewall" and not (
+            self.firewall_quarantine_cmd and self.firewall_release_cmd
+        ):
+            raise ConfigError(
+                "response.responder='firewall' requires firewall_quarantine_cmd "
+                "and firewall_release_cmd"
+            )
 
 
 @dataclass(frozen=True, slots=True)
