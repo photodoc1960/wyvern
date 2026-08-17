@@ -13,11 +13,21 @@ from .models import QState, QuarantineRecord
 
 
 class QuarantineStore:
-    def __init__(self) -> None:
+    def __init__(self, db=None) -> None:
         self._records: dict[str, QuarantineRecord] = {}
+        self._db = db
+        if db is not None:
+            for row in db.load_quarantines():
+                rec = QuarantineRecord.from_row(row)
+                self._records[rec.id] = rec
+
+    def _persist(self, record: QuarantineRecord) -> None:
+        if self._db is not None:
+            self._db.upsert_quarantine(record.to_row())
 
     def add(self, record: QuarantineRecord) -> QuarantineRecord:
         self._records[record.id] = record
+        self._persist(record)
         return record
 
     def get(self, record_id: str) -> QuarantineRecord | None:
@@ -38,6 +48,7 @@ class QuarantineStore:
             return None
         rec = replace(rec, status=QState.RELEASED, released_at=now)
         self._records[record_id] = rec
+        self._persist(rec)
         return rec
 
     def expire_due(self, now: float) -> list[QuarantineRecord]:
@@ -48,5 +59,6 @@ class QuarantineStore:
             if rec.status in live and rec.expires_at <= now:
                 rec = replace(rec, status=QState.EXPIRED)
                 self._records[rid] = rec
+                self._persist(rec)
                 expired.append(rec)
         return expired

@@ -53,6 +53,40 @@ class QuarantineRecord:
     mac: str | None = None  # for responders that act on a MAC
     id: str = field(default_factory=new_id)
 
+    def to_row(self) -> dict[str, Any]:
+        """Flat, primitive mapping for DB persistence."""
+        return {
+            "id": self.id,
+            "target": self.target,
+            "status": self.status,
+            "reason": self.reason,
+            "mode": self.mode,
+            "proposed_at": self.proposed_at,
+            "expires_at": self.expires_at,
+            "alert_id": self.alert_id,
+            "stage_count": self.stage_count,
+            "released_at": self.released_at,
+            "ip": self.ip,
+            "mac": self.mac,
+        }
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> QuarantineRecord:
+        return cls(
+            id=row["id"],
+            target=row["target"],
+            status=row["status"],
+            reason=row["reason"],
+            mode=row["mode"],
+            proposed_at=row["proposed_at"],
+            expires_at=row["expires_at"],
+            alert_id=row.get("alert_id"),
+            stage_count=row.get("stage_count"),
+            released_at=row.get("released_at"),
+            ip=row.get("ip"),
+            mac=row.get("mac"),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ResponseDecision:

@@ -46,7 +46,37 @@ CREATE TABLE IF NOT EXISTS devices (
     first_seen  REAL,
     last_seen   REAL
 );
+CREATE TABLE IF NOT EXISTS quarantines (
+    id          TEXT PRIMARY KEY,
+    target      TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    reason      TEXT,
+    mode        TEXT,
+    proposed_at REAL,
+    expires_at  REAL,
+    alert_id    TEXT,
+    stage_count INTEGER,
+    released_at REAL,
+    ip          TEXT,
+    mac         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_quarantines_status ON quarantines(status);
 """
+
+_QUARANTINE_COLS = (
+    "id",
+    "target",
+    "status",
+    "reason",
+    "mode",
+    "proposed_at",
+    "expires_at",
+    "alert_id",
+    "stage_count",
+    "released_at",
+    "ip",
+    "mac",
+)
 
 
 class WyvernDB:
@@ -109,7 +139,22 @@ class WyvernDB:
             )
             self._conn.commit()
 
+    def upsert_quarantine(self, row: dict) -> None:
+        placeholders = ",".join("?" for _ in _QUARANTINE_COLS)
+        with self._lock:
+            self._conn.execute(
+                f"INSERT OR REPLACE INTO quarantines ({','.join(_QUARANTINE_COLS)}) "
+                f"VALUES ({placeholders})",
+                tuple(row.get(col) for col in _QUARANTINE_COLS),
+            )
+            self._conn.commit()
+
     # ------------------------------------------------------------- reads
+    def load_quarantines(self) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM quarantines").fetchall()
+        return [dict(r) for r in rows]
+
     def recent_alerts(self, limit: int = 200, since: float | None = None) -> list[dict]:
         query = "SELECT * FROM alerts"
         params: list = []
