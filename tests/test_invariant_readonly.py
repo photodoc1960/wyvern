@@ -100,7 +100,9 @@ def test_scapy_is_capture_only() -> None:
 
 
 def test_subprocess_only_for_desktop_notification() -> None:
-    """The single permitted subprocess use is the notify-send list-form call.
+    """Subprocess spawns are confined to the notify-send call and explicitly
+    reviewed exceptions marked ``invariant-ok`` (e.g. the gated, off-by-default
+    Tier-1 firewall responder, #29).
 
     Only process-*spawning* calls are findings — bare attribute references such
     as ``subprocess.DEVNULL`` or ``except subprocess.SubprocessError`` don't run

@@ -29,6 +29,7 @@ class QState:
     PROPOSED = "proposed"
     PENDING = "pending"
     ACTIVE = "active"  # enforced (Phase 1+)
+    FAILED = "failed"  # responder attempted but the action did not apply
     EXPIRED = "expired"
     RELEASED = "released"
 
@@ -48,6 +49,8 @@ class QuarantineRecord:
     alert_id: str | None = None
     stage_count: int | None = None
     released_at: float | None = None
+    ip: str | None = None  # for responders that act on an IP
+    mac: str | None = None  # for responders that act on a MAC
     id: str = field(default_factory=new_id)
 
 
