@@ -176,6 +176,37 @@ class EnforceConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ResponsePolicy:
+    """Tier-1 active-response policy (issue #29).
+
+    Governs whether/how Wyvern proposes or takes containment action on a
+    high-confidence worm verdict. Defaults are deliberately inert:
+    ``mode='observe'`` means Wyvern only *records* "would quarantine X" and never
+    enforces. Autonomy is earned (observe -> confirm -> auto), never assumed —
+    Wyvern lacks anti-virus's signature precision and reputation feed, so it must
+    stay more conservative than AV.
+    """
+
+    mode: str = "observe"  # observe | confirm | auto
+    min_severity: int = 4  # only act on CRITICAL worm verdicts by default
+    protected_hosts: tuple[str, ...] = ()  # IPs/MACs that can NEVER be actioned
+    max_actions_per_window: int = 5  # circuit breaker: max actions per window
+    window_s: float = 300.0
+    quarantine_ttl_s: float = 3600.0  # auto-expiry / auto-release horizon
+
+    def validate(self) -> None:
+        if self.mode not in ("observe", "confirm", "auto"):
+            raise ConfigError("response.mode must be 'observe', 'confirm' or 'auto'")
+        if not (1 <= self.min_severity <= 4):
+            raise ConfigError("response.min_severity must be 1..4")
+        if self.max_actions_per_window <= 0:
+            raise ConfigError("response.max_actions_per_window must be positive")
+        for name in ("window_s", "quarantine_ttl_s"):
+            if getattr(self, name) <= 0:
+                raise ConfigError(f"response.{name} must be positive")
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     interface: str | None = None
     internal_cidrs: tuple[str, ...] = DEFAULT_PRIVATE_CIDRS
@@ -195,6 +226,7 @@ class Config:
     thresholds: Thresholds = field(default_factory=Thresholds)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
     enforce: EnforceConfig = field(default_factory=EnforceConfig)
+    response: ResponsePolicy = field(default_factory=ResponsePolicy)
 
     # ---- derived paths ----
     @property
@@ -231,6 +263,7 @@ class Config:
         self.thresholds.validate()
         self.notify.validate()
         self.enforce.validate()
+        self.response.validate()
         return self
 
     # ---- constructors ----
@@ -250,10 +283,14 @@ class Config:
         enforce_raw = dict(data.pop("enforce", {}) or {})
         enforce_raw.pop("signing_secret", None)  # never accept secrets from file
         enforce = EnforceConfig(**enforce_raw)
+        response_raw = dict(data.pop("response", {}) or {})
+        if isinstance(response_raw.get("protected_hosts"), list):
+            response_raw["protected_hosts"] = tuple(response_raw["protected_hosts"])
+        response = ResponsePolicy(**response_raw)
         for seq_key in ("internal_cidrs", "gpu_hosts", "no_egress_hosts"):
             if seq_key in data and isinstance(data[seq_key], list):
                 data[seq_key] = tuple(data[seq_key])
-        cfg = cls(thresholds=thresholds, notify=notify, enforce=enforce, **data)
+        cfg = cls(thresholds=thresholds, notify=notify, enforce=enforce, response=response, **data)
         cfg = cfg._with_env_overrides()
         return cfg.validate()
 

@@ -101,12 +101,14 @@ def _new_monitor(cfg: Config, *, learn: bool = True):
     from .alerting.enforcement import build_bridge
     from .alerting.notifier import build_notifier
     from .engine.monitor import Monitor
+    from .response import build_response_engine
 
     return Monitor(
         cfg,
         learn=learn,
         notifier=build_notifier(cfg.notify),
         bridge=build_bridge(cfg.enforce),
+        response=build_response_engine(cfg.response),
     )
 
 

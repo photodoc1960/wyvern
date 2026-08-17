@@ -49,6 +49,7 @@ class Monitor:
         learn: bool = True,
         notifier=None,
         bridge=None,
+        response=None,
         bus: EventBus | None = None,
         db: WyvernDB | None = None,
         eventlog: EventLog | None = None,
@@ -71,6 +72,7 @@ class Monitor:
         self.bus = bus if bus is not None else EventBus()
         self.notifier = notifier
         self.bridge = bridge
+        self.response = response
         self.learn = learn
 
         self._recent_alerts: deque[Alert] = deque(maxlen=5000)
@@ -186,6 +188,11 @@ class Monitor:
                 self.bridge.dispatch(alert)
             except Exception:  # noqa: BLE001 - enforcement must not affect the pipeline
                 log.debug("enforcement error", exc_info=True)
+        if self.response is not None:
+            try:
+                self.response.evaluate(alert, now=alert.ts)
+            except Exception:  # noqa: BLE001 - response evaluation must not affect the pipeline
+                log.debug("response engine error", exc_info=True)
         if alert.severity >= Severity.HIGH:
             log.warning("[%s] %s", alert.severity.label, alert.title)
 
