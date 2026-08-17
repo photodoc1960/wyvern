@@ -32,6 +32,7 @@ from ..detectors.loader import default_detectors, make_correlator
 from ..detectors.stream_timing import StreamTimingDetector
 from ..models.alert import Alert, Severity
 from ..models.events import ConnEvent, NetworkEvent, StreamSegmentEvent
+from ..response import build_response_engine
 from ..storage.db import WyvernDB
 from ..storage.eventlog import EventLog
 from ..tracking.registry import DeviceRegistry
@@ -72,7 +73,16 @@ class Monitor:
         self.bus = bus if bus is not None else EventBus()
         self.notifier = notifier
         self.bridge = bridge
-        self.response = response
+        # Build a DB-backed response engine (so quarantine state is durable) unless
+        # one was injected for testing; then reconcile any state that survived a
+        # restart — re-apply still-active rules, expire stale ones.
+        self.response = (
+            response if response is not None else build_response_engine(config.response, db=self.db)
+        )
+        try:
+            self.response.reconcile(time.time())
+        except Exception:  # noqa: BLE001 - reconciliation must not block startup
+            log.warning("quarantine reconciliation failed", exc_info=True)
         self.learn = learn
 
         self._recent_alerts: deque[Alert] = deque(maxlen=5000)

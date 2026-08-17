@@ -133,6 +133,20 @@ class ResponseEngine:
             self.responder.revert(rec)
         return self.store.release(record_id, now)
 
+    def reconcile(self, now: float) -> list[QuarantineRecord]:
+        """Restart reconciliation: expire stale records, then re-apply the rules
+        for quarantines that were ACTIVE before the restart (firewall state may
+        have been flushed on reboot). The store is already loaded from the DB.
+        Returns the records whose rules were re-applied.
+        """
+        self.sweep_expired(now)
+        reapplied: list[QuarantineRecord] = []
+        for rec in self.store.all():
+            if rec.status == QState.ACTIVE and self.responder is not None:
+                self.responder.apply(rec)
+                reapplied.append(rec)
+        return reapplied
+
     def sweep_expired(self, now: float) -> list[QuarantineRecord]:
         """Revert any past-TTL active rule, then mark due records EXPIRED."""
         live = {QState.PROPOSED, QState.PENDING, QState.ACTIVE}
@@ -169,8 +183,12 @@ class ResponseEngine:
         return len(self._recent) < self.policy.max_actions_per_window
 
 
-def build_response_engine(policy: ResponsePolicy) -> ResponseEngine:
-    """Always returns an engine; it is inert (observe + no responder) by default."""
+def build_response_engine(policy: ResponsePolicy, db=None) -> ResponseEngine:
+    """Always returns an engine; it is inert (observe + no responder) by default.
+
+    When ``db`` is provided, quarantine state is persisted and reloaded through it
+    (durable across restarts); the caller should then invoke :meth:`reconcile`.
+    """
     responder = None
     if (
         policy.responder == "firewall"
@@ -180,4 +198,4 @@ def build_response_engine(policy: ResponsePolicy) -> ResponseEngine:
         from .responders import FirewallResponder
 
         responder = FirewallResponder(policy.firewall_quarantine_cmd, policy.firewall_release_cmd)
-    return ResponseEngine(policy, responder=responder)
+    return ResponseEngine(policy, store=QuarantineStore(db=db), responder=responder)
