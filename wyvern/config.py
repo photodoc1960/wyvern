@@ -54,7 +54,17 @@ class Thresholds:
     # Beaconing: regular callbacks on a non-standard port.
     beacon_min_callbacks: int = 6
     beacon_window_s: float = 1800.0
-    beacon_max_cov: float = 0.20  # inter-arrival coefficient of variation
+    # Inter-arrival coefficient of variation, in two bands (see beacon.py):
+    #   cov <= beacon_tight_cov -> metronomic callback, standalone-strength alert
+    #   cov <= beacon_max_cov   -> jittered but periodic, weak corroborating hint
+    # The wider bound is the empirical autonomous-agent band: Li (2026, "The
+    # Moltbook Illusion") classifies CoV < 0.5 as autonomous and > 1.0 as
+    # human-driven over 55,932 agents, and Luo (2026, "Behavioral Grammar")
+    # measures CoV 0.31 for an agent actively mimicking benign cadence against
+    # 9.79 for benign activity. A 0.20 cutoff alone is evaded by ±30% jitter.
+    beacon_tight_cov: float = 0.20
+    beacon_max_cov: float = 0.50
+    beacon_jittered_confidence: float = 0.35  # corroboration-only, never standalone
     beacon_min_interval_s: float = 2.0
     # Idle-device code execution (printer/router/NAS suddenly active).
     idle_outbound_conns: int = 3
@@ -101,8 +111,10 @@ class Thresholds:
             raise ConfigError("no_egress_confidence must be in (0, 1]")
         if not (0.0 < self.dga_score <= 1.0):
             raise ConfigError("dga_score must be in (0, 1]")
-        if not (0.0 < self.beacon_max_cov <= 1.0):
-            raise ConfigError("beacon_max_cov must be in (0, 1]")
+        if not (0.0 < self.beacon_tight_cov <= self.beacon_max_cov <= 1.0):
+            raise ConfigError("beacon cov bounds must satisfy 0 < tight <= max <= 1")
+        if not (0.0 < self.beacon_jittered_confidence <= 1.0):
+            raise ConfigError("beacon_jittered_confidence must be in (0, 1]")
         if self.worm_stages_critical < self.worm_stages_high:
             raise ConfigError("worm_stages_critical must be >= worm_stages_high")
         if not self.stream_timing_ports:

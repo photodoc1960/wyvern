@@ -124,7 +124,7 @@ pure and fully unit-tested.
 | `ssh_key_injection` | **SSH public-key injection** (§5) | SSH fan-out from an idle / never-SSH device |
 | `inference_api` | **reasoning proxy** (Fig. 1) | LLM inference (`/v1/chat/completions`, vLLM/ollama ports) **from a non-GPU device** |
 | `stream_timing` | **reasoning proxy over encrypted HTTPS** | a long-lived 443 response stream to a non-GPU device shows the inter-packet **token-streaming rhythm** — a weak corroborating hint, timing metadata only |
-| `beacon` | **beacon callbacks on non-standard ports** (§5) | regular low-jitter callbacks to a non-standard port |
+| `beacon` | **beacon callbacks on non-standard ports** (§5) | regular callbacks to a non-standard port — near-constant cadence alerts on its own, jittered-but-periodic cadence only corroborates |
 | `idle_exec` | **self-replication / code exec** | a printer/router/NAS/camera starts **originating** connections |
 | `dns_anomaly` | C2 lookups | query spikes, NXDOMAIN bursts, DGA-looking domains |
 
@@ -138,6 +138,28 @@ inter-packet cadence LLM autoregressive generation leaves on the streamed respon
 avoid false positives on ordinary long-lived HTTPS (video, downloads, websockets). This
 addresses the "`inference_api` blind to LLM inference routed over HTTPS" limitation in
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
+
+`beacon` grades its jitter test over **two bands** instead of demanding a metronomic
+cadence, because adding jitter to a callback interval is the cheapest possible evasion of
+a single tight cutoff and requires no change to the attacker's design:
+
+- **CoV ≤ `beacon_tight_cov` (0.20)** — near-constant callbacks: the classic beacon
+  signature, alerting at full strength as before.
+- **CoV ≤ `beacon_max_cov` (0.50)** — jittered but still periodic: a deliberately weak,
+  LOW-severity signal (`beacon_jittered_confidence`, decaying across the band). It
+  contributes a `beacon_callback` stage to `worm_signature` but never carries a verdict
+  alone, since moderately-jittered benign polling (update checks, vendor telemetry,
+  keep-alives) also lives in this band.
+
+The wider bound is the empirical autonomous-agent dispersion band: Li (2026, *The Moltbook
+Illusion*) separates autonomous (CoV < 0.5) from human-driven (CoV > 1.0) activity across
+55,932 agents and notes that agent-framework heartbeats are jittered rather than
+metronomic, and Luo (2026, *Behavioral Grammar*) measures CoV 0.31 for an agent actively
+mimicking benign cadence against 9.79 for benign activity. Both place a jittering beacon
+far from benign traffic yet outside a 0.20 cutoff. Mo et al. (2026, *PFDetector*, IEEE
+Access) independently confirm inter-arrival dispersion as the right primitive at
+network-flow level. Tighten `beacon_max_cov` back towards 0.20 if your network's benign
+periodic traffic proves noisy in this band.
 
 ### The composite signature
 
