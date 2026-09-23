@@ -60,7 +60,9 @@ thresholds:
   inference_window_s: 300
   beacon_min_callbacks: 6   # regular callbacks to flag a beacon
   beacon_window_s: 1800
-  beacon_max_cov: 0.20      # max inter-arrival jitter (coefficient of variation)
+  beacon_tight_cov: 0.20    # metronomic cadence -> standalone-strength alert
+  beacon_max_cov: 0.50      # jittered but periodic (autonomous-agent CoV band)
+  beacon_jittered_confidence: 0.35  # weak corroborating confidence in that band
   beacon_min_interval_s: 2
   idle_outbound_conns: 3    # idle device originating >N flows -> code execution
   idle_window_s: 600
