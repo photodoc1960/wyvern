@@ -118,7 +118,11 @@ def classify_role(
     if is_gateway:
         return DeviceRole.ROUTER
 
-    if current is not DeviceRole.UNKNOWN:
+    # A previously *inferred* role persists, with one exception: ``ROUTER`` is
+    # only ever guessed from the weak gateway heuristic, so it must not outlive
+    # that evidence. Without it we re-derive rather than stay wrong forever —
+    # ``router`` is in IDLE_ROLES and so drives alerting (#39).
+    if current is not DeviceRole.UNKNOWN and not (current is DeviceRole.ROUTER and not is_gateway):
         return current
 
     # Fall back to a coarse guess from OS family.
