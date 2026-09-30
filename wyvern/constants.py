@@ -162,6 +162,14 @@ STAGE_REPLICATION = "idle_device_exec"
 # would let two facets of the same behaviour trip the 2-stage worm verdict).
 STAGE_INFERENCE_TIMING = "inference_timing"
 
+# A jittered-but-periodic callback (CoV inside ``beacon_tight_cov..beacon_max_cov``).
+# Deliberately NOT in WORM_STAGES: benign jittered polling — OS/app update checks,
+# vendor telemetry, push keep-alives — lives in that same dispersion band, and the
+# correlator FLOORS a 2-stage verdict at 0.75 confidence, discarding the weak
+# confidence this band is graded with. Excluding it from the stage set is therefore
+# the only thing that actually keeps it "corroborating, never standalone" (#35).
+STAGE_BEACON_JITTERED = "beacon_jittered"
+
 WORM_STAGES: tuple[str, ...] = (
     STAGE_RECON,
     STAGE_LATERAL,

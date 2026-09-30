@@ -27,7 +27,7 @@ and needs no architectural change by the attacker:
 
 from __future__ import annotations
 
-from ..constants import STAGE_BEACON
+from ..constants import STAGE_BEACON, STAGE_BEACON_JITTERED
 from ..indicators import is_nonstandard_port
 from ..models.alert import Alert, Severity
 from ..models.events import ConnEvent, NetworkEvent
@@ -122,7 +122,7 @@ class BeaconDetector(Detector):
             ),
             severity=Severity.from_confidence(confidence),
             confidence=confidence,
-            stage=STAGE_BEACON,
+            stage=STAGE_BEACON_JITTERED if jittered else STAGE_BEACON,
             description=f"{label} contacted {dst_ip}:{dst_port} {len(stamps)} times at {cadence}",
             src_mac=device.mac if device else None,
             src_ip=src_ip,
