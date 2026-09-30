@@ -7,6 +7,7 @@ timeline without, on their own, asserting "worm".
 
 from __future__ import annotations
 
+from ..indicators import is_mdns_name
 from ..models.alert import Alert, Severity
 from ..models.events import DnsEvent, NetworkEvent
 from ..util.entropy import dga_score
@@ -61,7 +62,8 @@ class DnsAnomalyDetector(Detector):
                 )
             )
 
-        score = dga_score(event.qname)
+        # mDNS names are link-local and embed UUIDs by design — never DGA (#40).
+        score = 0.0 if is_mdns_name(event.qname) else dga_score(event.qname)
         if score >= self.t.dga_score and self._dga_cool.fire((qid, event.qname), event.ts):
             confidence = clamp01(0.30 + 0.45 * score)
             alerts.append(
@@ -83,6 +85,10 @@ class DnsAnomalyDetector(Detector):
 
     def _inspect_response(self, event: DnsEvent, ctx: DetectorContext) -> list[Alert]:
         if not event.is_nxdomain or not event.dst_ip:
+            return []
+        # A link-local mDNS miss is ordinary LAN chatter, not resolver-side C2
+        # domain enumeration (#40).
+        if is_mdns_name(event.qname):
             return []
         querier = ctx.registry.get_by_ip(event.dst_ip)
         qid = querier.mac if querier else event.dst_ip
@@ -106,6 +112,10 @@ class DnsAnomalyDetector(Detector):
                 src_mac=querier.mac if querier else None,
                 src_ip=event.dst_ip,
                 ts=event.ts,
-                evidence={"nxdomain_count": count, "window_seconds": self.t.dns_window_s},
+                evidence={
+                    "nxdomain_count": count,
+                    "window_seconds": self.t.dns_window_s,
+                    "last_domain": event.qname,
+                },
             )
         ]

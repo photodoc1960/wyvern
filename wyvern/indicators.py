@@ -66,6 +66,30 @@ def inference_confidence(host: str | None, path: str | None, port: int) -> float
     return score
 
 
+# Multicast-DNS service labels (RFC 6763). Service-discovery names embed UUIDs by
+# design, so they always score high on entropy.
+_MDNS_SERVICE_LABELS = ("_tcp.", "_udp.")
+
+
+def is_mdns_name(name: str | None) -> bool:
+    """True for a multicast-DNS name, which must never be scored as DGA.
+
+    ``.local`` is reserved for mDNS (RFC 6762): it is resolved by link-local
+    multicast on the LAN and never by a recursive resolver, so a high-entropy
+    ``.local`` name cannot act as a C2 rendezvous. Treating these as
+    algorithmically-generated domains produced 78% of all alerts in a 41-day live
+    run (#40).
+    """
+    if not name:
+        return False
+    n = name.strip().lower().rstrip(".")
+    if not n:
+        return False
+    if n == "local" or n.endswith(".local"):
+        return True
+    return any(label in n + "." for label in _MDNS_SERVICE_LABELS)
+
+
 def is_worm_service_port(port: int) -> bool:
     return port in WORM_SERVICE_PORTS
 
