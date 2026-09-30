@@ -20,7 +20,7 @@ from ..models.events import (
     NetworkEvent,
 )
 from ..util import oui
-from ..util.nets import is_internal_ip, is_usable_host_ip, normalize_mac
+from ..util.nets import is_gateway_ip, is_internal_ip, is_usable_host_ip, normalize_mac
 from . import fingerprint
 
 # Bound memory against a flood of spoofed MACs on a shared segment. A home LAN
@@ -109,9 +109,8 @@ class DeviceRegistry:
     def _internal(self, ip: str | None) -> bool:
         return is_internal_ip(ip, self.config.internal_cidrs)
 
-    @staticmethod
-    def _is_gateway(ip: str | None) -> bool:
-        return bool(ip) and (ip.endswith(".1") or ip.endswith(".254"))
+    def _is_gateway(self, ip: str | None) -> bool:
+        return is_gateway_ip(ip, self.config.internal_cidrs)
 
     def _key(self, mac: str | None, ip: str | None) -> str | None:
         norm = normalize_mac(mac)

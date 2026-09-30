@@ -100,6 +100,28 @@ def is_internal_ip(ip: str | None, cidrs: tuple[str, ...] | None = None) -> bool
     return ip_in_cidrs(ip, tuple(cidrs) if cidrs else DEFAULT_PRIVATE_CIDRS)
 
 
+def is_gateway_ip(ip: str | None, cidrs: tuple[str, ...] | None = None) -> bool:
+    """True if ``ip`` is a plausible gateway for one of the configured networks.
+
+    A gateway conventionally occupies the first or last usable host address of
+    its subnet. Matching on a ``.1``/``.254`` *suffix* is only correct on a /24:
+    on a /22, three of the four ``.1`` addresses are ordinary hosts, which caused
+    widespread bogus ``router`` classification (#39). Addresses outside the
+    configured internal networks are never gateways.
+    """
+    addr = _parse_ip(ip)
+    if addr is None:
+        return False
+    for net in _parse_networks(tuple(cidrs) if cidrs else DEFAULT_PRIVATE_CIDRS):
+        if addr.version != net.version or addr not in net:
+            continue
+        if net.num_addresses < 4:  # /31, /32 and v6 equivalents: no gateway slot
+            continue
+        if addr in (net.network_address + 1, net.broadcast_address - 1):
+            return True
+    return False
+
+
 def is_global_ip(ip: str | None) -> bool:
     """True if ``ip`` is a routable public address."""
     addr = _parse_ip(ip)
