@@ -42,3 +42,29 @@ def test_nonstandard_ports():
     assert is_nonstandard_port(4444)
     assert not is_nonstandard_port(443)
     assert not is_nonstandard_port(53)
+
+
+def test_captive_portal_probe_is_not_inference():
+    """Regression (#38): ``/generate_204`` must not match the ``/generate`` marker.
+
+    Apple/Android captive-portal detection fetches ``GET /generate_204``. Naive
+    substring matching scored it 0.9 ("strongest signal") and produced 342
+    CRITICAL false positives in a 41-day live run.
+    """
+    assert inference_confidence("captive.apple.com", "/generate_204", 80) == 0.0
+    assert not is_inference_endpoint("captive.apple.com", "/generate_204", 80)
+    assert not is_inference_endpoint("connectivitycheck.gstatic.com", "/generate_204", 80)
+
+
+def test_inference_paths_match_on_segment_boundaries():
+    # Real endpoints must still score as inference.
+    assert inference_confidence(None, "/generate", 9999) >= 0.9
+    assert inference_confidence(None, "/api/generate", 9999) >= 0.9
+    assert inference_confidence(None, "/api/chat", 9999) >= 0.9
+    assert inference_confidence(None, "/v1/chat/completions", 9999) >= 0.9
+    assert inference_confidence(None, "/v1/chat/completions?stream=true", 9999) >= 0.9
+    assert inference_confidence(None, "/generate/stream", 9999) >= 0.9
+    # Near-misses on the short, generic markers must not.
+    assert inference_confidence(None, "/generate_204", 9999) == 0.0
+    assert inference_confidence(None, "/inference-docs", 9999) == 0.0
+    assert inference_confidence(None, "/completions-guide", 9999) == 0.0
