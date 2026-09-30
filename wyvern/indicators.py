@@ -22,6 +22,30 @@ def is_inference_endpoint(host: str | None, path: str | None, port: int) -> bool
     return inference_confidence(host, path, port) > 0.0
 
 
+# Path markers must land on a segment boundary. Naive substring matching made
+# captive-portal probes (``/generate_204``) match the ``/generate`` marker and
+# score as LLM inference — 342 CRITICAL false positives in a 41-day run (#38).
+_PATH_BOUNDARY = ("/", "?", "#")
+
+
+def _path_has_marker(path: str, marker: str) -> bool:
+    """True if ``marker`` occurs in ``path`` as a complete path segment.
+
+    A marker counts only when it ends at the end of the path or at a segment /
+    query boundary, so ``/generate`` matches ``/generate``, ``/generate/stream``
+    and ``/generate?x=1`` but not ``/generate_204``.
+    """
+    start = 0
+    while True:
+        found = path.find(marker, start)
+        if found < 0:
+            return False
+        end = found + len(marker)
+        if end == len(path) or path[end] in _PATH_BOUNDARY:
+            return True
+        start = found + 1
+
+
 def inference_confidence(host: str | None, path: str | None, port: int) -> float:
     """A 0..1 confidence that this request targets an LLM inference service.
 
@@ -31,7 +55,7 @@ def inference_confidence(host: str | None, path: str | None, port: int) -> float
     score = 0.0
     if path:
         p = path.lower()
-        if any(marker in p for marker in INFERENCE_PATH_MARKERS):
+        if any(_path_has_marker(p, marker) for marker in INFERENCE_PATH_MARKERS):
             score = max(score, 0.9)
     if port in INFERENCE_PORTS:
         score = max(score, 0.6)
