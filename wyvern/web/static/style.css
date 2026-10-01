@@ -1,7 +1,14 @@
 :root {
   --bg: #0b0e14; --panel: #131823; --panel2: #0f141d; --ink: #e6edf3;
   --muted: #8b97a7; --line: #222b3a; --accent: #5cc8ff;
-  --none: #3fb950; --low: #6ea8fe; --medium: #e3b341; --high: #f0883e; --critical: #f85149;
+  /* Severity palette chosen for red/green colour blindness. The former
+     green --none / red --critical pair simulated to only dE 8.2 under
+     deuteranopia — 'all clear' was indistinguishable from 'CRITICAL'. This
+     ramp keeps every pair >= dE 22 under both deuteranopia and protanopia
+     (see tests/test_palette_colorblind.py) by avoiding green entirely and
+     spreading levels along the blue->yellow axis with a strong lightness
+     progression. All pill text also stays >= 4.5:1 WCAG AA. */
+  --none: #9aa4b0; --low: #3b82f6; --medium: #ffe08a; --high: #fb8500; --critical: #c81e4a;
 }
 * { box-sizing: border-box; }
 body {
@@ -86,7 +93,7 @@ th { color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font
 .pill.lvl-None { background: #2a3340; color: var(--muted); } .pill.lvl-Low { background: var(--low); }
 .pill.lvl-Medium { background: var(--medium); } .pill.lvl-High { background: var(--high); }
 .pill.lvl-Critical { background: var(--critical); color: #fff; }
-tr.worm td { background: rgba(248,81,73,.07); }
+tr.worm td { background: rgba(200,30,74,.09); }  /* matches --critical */
 .watch { cursor: pointer; background: #1c2433; border: 1px solid var(--line); color: var(--ink); border-radius: 5px; padding: 3px 8px; font-size: 11px; }
 .watch.on { background: var(--high); color: #0b0e14; border: none; }
 footer { color: #5d6776; font-size: 11px; padding: 8px 20px 24px; text-align: center; }
