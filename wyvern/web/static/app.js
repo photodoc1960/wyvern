@@ -74,7 +74,13 @@ function renderTopology(topo) {
     svg.appendChild(ln);
   });
   // nodes
-  const color = (lvl) => ({ None: "#3fb950", Low: "#6ea8fe", Medium: "#e3b341", High: "#f0883e", Critical: "#f85149" }[lvl] || "#3fb950");
+  // Severity colours come from the CSS custom properties, so the palette has a
+  // single source of truth. A second copy here is why the topology kept drawing
+  // the old red/green scheme after the stylesheet was corrected.
+  const rootCss = getComputedStyle(document.documentElement);
+  const color = (lvl) =>
+    rootCss.getPropertyValue("--" + String(lvl || "none").toLowerCase()).trim() ||
+    rootCss.getPropertyValue("--none").trim();
   Object.values(pos).forEach(({ x, y, n }) => {
     const g = document.createElementNS(SVGNS, "g");
     g.setAttribute("class", "node" + (n.worm_suspect ? " worm" : ""));
