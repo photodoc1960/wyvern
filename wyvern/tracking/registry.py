@@ -21,11 +21,14 @@ from ..models.events import (
 )
 from ..util import oui
 from ..util.nets import is_gateway_ip, is_internal_ip, is_usable_host_ip, normalize_mac
-from . import fingerprint
+from . import fingerprint, mdns
 
 # Bound memory against a flood of spoofed MACs on a shared segment. A home LAN
 # rarely exceeds a few hundred devices; we keep the most-recently-seen ones.
 _MAX_DEVICES = 4096
+
+
+_MDNS_OVERRIDABLE = frozenset({DeviceRole.UNKNOWN, DeviceRole.ROUTER})
 
 
 class DeviceRegistry:
@@ -78,12 +81,28 @@ class DeviceRegistry:
         if isinstance(event, DhcpEvent):
             return self._observe_dhcp(event)
         if isinstance(event, DnsEvent):
-            return self._upsert(event.src_mac, event.src_ip, event.ts)
+            return self._observe_dns(event)
         return None
 
     # ------------------------------------------------------- event handlers
     def _observe_arp(self, ev: ArpEvent) -> Device | None:
         return self._upsert(ev.src_mac, ev.src_ip, ev.ts)
+
+    def _observe_dns(self, ev: DnsEvent) -> Device | None:
+        device = self._upsert(ev.src_mac, ev.src_ip, ev.ts)
+        # Only a *response* identifies its sender as the service owner; a query
+        # names a service the sender is merely looking for (see tracking.mdns).
+        if device is None or not ev.is_response:
+            return device
+        ident = mdns.identify(ev.qname)
+        if ident is None:
+            return device
+        role, label = ident
+        # mDNS is direct positive evidence, so it may replace a role that was only
+        # guessed — UNKNOWN, or the provisional ROUTER guess (#39) — but never an
+        # already evidence-backed one.
+        new_role = role if device.role in _MDNS_OVERRIDABLE else device.role
+        return self._store(device.evolve(hostname=device.hostname or label, role=new_role))
 
     def _observe_conn(self, ev: ConnEvent) -> Device | None:
         ttl = ev.ttl if ev.is_syn or ev.is_synack else None
