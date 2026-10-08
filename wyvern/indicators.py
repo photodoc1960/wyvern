@@ -90,6 +90,27 @@ def is_mdns_name(name: str | None) -> bool:
     return any(label in n + "." for label in _MDNS_SERVICE_LABELS)
 
 
+def is_reverse_dns_name(name: str | None) -> bool:
+    """True for a reverse-DNS (PTR) name, which must never be scored as DGA.
+
+    ``.arpa`` is the reserved infrastructure zone (RFC 3172). ``in-addr.arpa`` and
+    ``ip6.arpa`` lookups fail routinely for private and IPv6 addresses, and the
+    IPv6 nibble form is high-entropy by construction, so these names are neither
+    algorithmically-generated domains nor resolver-side C2 enumeration (#40 was the
+    same category error for mDNS).
+    """
+    if not name:
+        return False
+    n = name.strip().lower().rstrip(".")
+    return n == "arpa" or n.endswith(".arpa")
+
+
+def is_infrastructure_name(name: str | None) -> bool:
+    """True for names resolved by LAN/infrastructure machinery rather than a
+    recursive resolver — mDNS and reverse DNS. Never DGA candidates."""
+    return is_mdns_name(name) or is_reverse_dns_name(name)
+
+
 def is_worm_service_port(port: int) -> bool:
     return port in WORM_SERVICE_PORTS
 

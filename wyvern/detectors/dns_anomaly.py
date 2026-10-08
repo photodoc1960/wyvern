@@ -7,7 +7,7 @@ timeline without, on their own, asserting "worm".
 
 from __future__ import annotations
 
-from ..indicators import is_mdns_name
+from ..indicators import is_infrastructure_name
 from ..models.alert import Alert, Severity
 from ..models.events import DnsEvent, NetworkEvent
 from ..util.entropy import dga_score
@@ -63,7 +63,20 @@ class DnsAnomalyDetector(Detector):
             )
 
         # mDNS names are link-local and embed UUIDs by design — never DGA (#40).
-        score = 0.0 if is_mdns_name(event.qname) else dga_score(event.qname)
+        # mDNS and reverse-DNS names are link-local/infrastructure lookups, never
+        # DGA candidates (#40, and the .arpa case found in a week of live capture).
+        # A DGA rendezvous is also by nature a domain this device has not resolved
+        # before, so a name already in its learned baseline is not suspicious —
+        # one known AWS ELB hostname produced 20 of 23 DGA alerts in that week.
+        # An unlearned profile must not blind the detector during the 24h window.
+        profile = ctx.profiles.get(querier.mac) if querier else None
+        known_to_device = bool(
+            profile and profile.learned and not profile.is_new_domain(event.qname)
+        )
+        if is_infrastructure_name(event.qname) or known_to_device:
+            score = 0.0
+        else:
+            score = dga_score(event.qname)
         if score >= self.t.dga_score and self._dga_cool.fire((qid, event.qname), event.ts):
             confidence = clamp01(0.30 + 0.45 * score)
             alerts.append(
@@ -88,7 +101,7 @@ class DnsAnomalyDetector(Detector):
             return []
         # A link-local mDNS miss is ordinary LAN chatter, not resolver-side C2
         # domain enumeration (#40).
-        if is_mdns_name(event.qname):
+        if is_infrastructure_name(event.qname):
             return []
         querier = ctx.registry.get_by_ip(event.dst_ip)
         qid = querier.mac if querier else event.dst_ip
