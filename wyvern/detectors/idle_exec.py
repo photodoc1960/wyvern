@@ -31,8 +31,25 @@ class IdleDeviceExecDetector(Detector):
             return []
         if not ctx.internal(event.src_ip):
             return []
+        # Self-replication reaches other hosts on the LAN. Outbound *internet*
+        # chatter is normal for cloud-native appliances — Sonos streams, a Roomba
+        # is cloud-controlled, a printer does ePrint and firmware checks, a
+        # Powerwall reports telemetry — and Wyvern keeps no learned baseline of
+        # external destinations, so it cannot distinguish normal from abnormal
+        # there. All 3,689 historical alerts from this detector were ordinary
+        # web/package traffic (Apple, Google, Cloudflare, AWS, archive.ubuntu.com)
+        # from one mislabelled workstation. Outbound-to-internet behaviour is
+        # covered by beacon, inference_api, stream_timing and zero_egress.
+        if not ctx.internal(event.dst_ip):
+            return []
         device = ctx.device_for(event)
         if device is None or device.role not in IDLE_ROLES:
+            return []
+        # Where a baseline exists, only peers this device has never reached count:
+        # an appliance talking to its usual LAN hosts is not replicating. An
+        # unlearned profile must not blind the detector during the 24h window.
+        profile = ctx.profiles.get(device.mac)
+        if profile is not None and profile.learned and not profile.is_new_peer(event.dst_ip):
             return []
 
         win = self._outbound.add(device.mac, event.ts, (event.dst_ip, event.dst_port))
