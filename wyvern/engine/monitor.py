@@ -23,6 +23,7 @@ from collections.abc import Iterable
 
 from ..assessment.remediation import enrich
 from ..assessment.threat import NetworkAssessment, ThreatAssessor
+from ..assessment.visibility import VisibilityCounters, assess_visibility
 from ..baseline.learner import BaselineLearner
 from ..baseline.store import load_baselines, save_baselines
 from ..capture.decode import decode_frame
@@ -96,6 +97,9 @@ class Monitor:
         self._sweeper: threading.Thread | None = None
         self.frame_count = 0
         self.event_count = 0
+        # Which traffic classes actually reach this capture point. Without this a
+        # clean dashboard is indistinguishable from a blind sensor.
+        self._visibility = VisibilityCounters()
 
         saved = load_baselines(config.baseline_path)
         if saved:
@@ -114,6 +118,7 @@ class Monitor:
 
     def _process_locked(self, event: NetworkEvent) -> list[Alert]:
         self.event_count += 1
+        self._visibility.observe(event, self.config.internal_cidrs)
         # Stream segments are high-volume, payload-free timing samples. They take
         # a dedicated fast path straight to the stream-timing detector, bypassing
         # device tracking, baseline learning, edge tracking and the other
@@ -319,10 +324,23 @@ class Monitor:
             alerts = list(self._recent_alerts)[-limit:]
         return [a.to_dict() for a in reversed(alerts)]
 
+    def visibility(self) -> object:
+        """What this capture point can and cannot see (see assessment.visibility)."""
+        with self._lock:
+            counts: dict[str, int] = {}
+            for alert in self._recent_alerts:
+                counts[alert.detector] = counts.get(alert.detector, 0) + 1
+        return assess_visibility(
+            self._visibility,
+            alert_counts=counts,
+            no_egress_hosts=self.config.no_egress_hosts,
+        )
+
     def stats(self) -> dict:
         assessment = self.current_assessment()
         return {
             "devices": len(self.registry),
+            "visibility": self.visibility().to_dict(),
             "events_processed": self.event_count,
             "frames_processed": self.frame_count,
             "alerts": len(self._recent_alerts),
