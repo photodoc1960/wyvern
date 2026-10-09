@@ -150,6 +150,7 @@ def _cmd_replay(cfg: Config, args) -> int:
         return 1
     print(f"replayed {count} frames; {mon.event_count} events, {len(mon._recent_alerts)} alerts.")
     _print_report(mon.current_assessment())
+    _print_visibility(mon)
     if args.web:
         from .web.app import run_dashboard
 
@@ -169,6 +170,7 @@ def _cmd_simulate(cfg: Config, args) -> int:
     mon.feed_events(events)
     print(f"simulated {len(events)} events; raised {len(mon._recent_alerts)} alerts.")
     _print_report(mon.current_assessment())
+    _print_visibility(mon)
     if args.web:
         from .web.app import run_dashboard
 
@@ -198,6 +200,30 @@ def _cmd_report(cfg: Config) -> int:
     assessment = ThreatAssessor(cfg).assess(alerts, registry)
     _print_report(assessment)
     return 0
+
+
+def _print_visibility(mon) -> None:
+    """Print what the sensor can and cannot see.
+
+    Printed alongside every report because an absence of alerts is only
+    meaningful once you know which detectors were able to fire at all.
+    """
+    rep = mon.visibility()
+    print("\n  CAPTURE VISIBILITY")
+    print(f"    scope: {rep.scope}")
+    print(f"    {rep.note}")
+    print(
+        f"    devices seen {rep.devices_seen}  |  with unicast visible "
+        f"{rep.devices_with_unicast}  |  egress {rep.devices_with_egress}  "
+        f"|  intra-LAN {rep.devices_with_internal_unicast}"
+    )
+    if rep.dormant:
+        print(f"    DORMANT detectors (cannot fire here): {', '.join(rep.dormant)}")
+    if rep.unenforceable_no_egress:
+        print(
+            "    UNENFORCEABLE no_egress_hosts (traffic never observed): "
+            f"{', '.join(rep.unenforceable_no_egress)}"
+        )
 
 
 def _cmd_export(cfg: Config, args) -> int:
