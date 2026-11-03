@@ -4,7 +4,7 @@
 [![Docker](https://github.com/photodoc1960/wyvern/actions/workflows/docker.yml/badge.svg)](https://github.com/photodoc1960/wyvern/actions/workflows/docker.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Tests](https://img.shields.io/badge/tests-123-brightgreen)
+![Tests](https://img.shields.io/badge/tests-243-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)
 
 Wyvern is a **passive, read-only** network monitor and anomaly detector for home
@@ -18,6 +18,14 @@ It is built with **scapy** (capture), **dpkt** (analysis) and **Flask**
 (dashboard), exactly as a defensive blue-team tool should be.
 
 ---
+
+> **Where you run it decides what it can detect.** Home networks are switched, so
+> a sensor on your main PC sees that PC plus broadcasts — and four of the ten
+> detectors cannot fire at all from there. On such a deployment an absence of
+> alerts is *not* evidence your network is clean. Wyvern reports its own blind
+> spots (`curl -s localhost:8787/api/stats | jq .visibility`) so you never have to
+> guess. Read [§2 of the deployment guide](docs/DEPLOYMENT.md) before trusting a
+> quiet dashboard.
 
 ## ⚖️ What Wyvern will and won't do
 

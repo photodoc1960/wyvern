@@ -1,0 +1,57 @@
+# Wyvern as a service, run from a git checkout as your own user.
+#
+# The packaged unit (deploy/wyvern.service) assumes /opt/wyvern, /etc/wyvern and a
+# dedicated `wyvern` user, which is right for an installed deployment. This variant
+# is for the common case of running from a clone you also develop in.
+#
+# Edit the three paths below, then:
+#   sudo cp deploy/wyvern-checkout.service /etc/systemd/system/wyvern.service
+#   sudo chown -R $USER:$USER <your data_dir>     # if it was previously run via sudo
+#   sudo systemctl daemon-reload && sudo systemctl enable --now wyvern
+#
+# Check it with:  systemctl status wyvern  ·  journalctl -u wyvern -f
+
+[Unit]
+Description=Wyvern passive AI-worm network sentinel
+Documentation=https://github.com/photodoc1960/wyvern
+# The capture interface must exist before the socket is opened, or capture starts
+# blind on a slow-coming-up link.
+After=network-online.target
+Wants=network-online.target
+# Stop and leave evidence in the journal rather than crash-looping forever on a
+# genuine misconfiguration.
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+# ---- edit these three ----
+User=CHANGEME
+Group=CHANGEME
+WorkingDirectory=/home/CHANGEME/wyvern
+ExecStart=/home/CHANGEME/wyvern/.venv/bin/python -m wyvern \
+  -c /home/CHANGEME/.config/wyvern/config.yaml monitor
+# --------------------------
+
+# Live capture needs raw sockets and promiscuous mode — grant just those two
+# capabilities rather than running as root. Running as your own user also keeps the
+# learned state (baselines.json, the SQLite DB) readable without sudo; a root-owned
+# monitor rewrites those files 0600 on every sweep.
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+
+# Survive an interface flap, a WiFi drop, or an unhandled exception. Without this a
+# dropped link closes the capture socket and monitoring stops silently.
+Restart=always
+RestartSec=10
+
+PrivateTmp=true
+UMask=0022
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wyvern
+
+[Install]
+WantedBy=multi-user.target
