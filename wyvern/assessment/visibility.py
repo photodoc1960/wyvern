@@ -30,6 +30,11 @@ CLASS_INTERNAL_UNICAST = "internal_unicast"
 CLASS_EGRESS = "egress"
 CLASS_OTHER = "other"
 
+# A traffic class is credited as visible only when at least this many distinct devices,
+# and this share of all devices seen, are observed producing it.
+_MIN_SOURCES = 3
+_MIN_SOURCE_FRACTION = 0.25
+
 # What traffic class each detector needs in order to be able to fire at all.
 DETECTOR_NEEDS: Mapping[str, str] = {
     "port_scan": CLASS_INTERNAL_UNICAST,
@@ -140,10 +145,15 @@ def assess_visibility(
     """
     alert_counts = alert_counts or {}
     observed = {c for c, n in counters.counts.items() if n > 0}
-    # Multiple sources are required before a class counts as genuinely visible:
-    # a single source is usually just the capture host observing itself.
-    multi_internal = len(counters.internal_unicast_sources) >= 2
-    multi_egress = len(counters.egress_sources) >= 2
+    # A traffic class counts as visible only when a real share of the devices on the
+    # network demonstrate it. An earlier "two or more sources" floor was far too
+    # lenient: a live run saw 39 devices with internal unicast from just 2 of them (the
+    # capture host and the gateway) and duly reported the four intra-LAN detectors as
+    # live, when they had raised zero alerts in 48 days. Two of thirty-nine is noise.
+    seen = len(counters.all_sources)
+    need = max(_MIN_SOURCES, int(seen * _MIN_SOURCE_FRACTION))
+    multi_internal = len(counters.internal_unicast_sources) >= need
+    multi_egress = len(counters.egress_sources) >= need
     if multi_internal and multi_egress:
         scope = "lan"
     elif multi_egress:

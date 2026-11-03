@@ -326,10 +326,15 @@ class Monitor:
 
     def visibility(self) -> object:
         """What this capture point can and cannot see (see assessment.visibility)."""
-        with self._lock:
-            counts: dict[str, int] = {}
-            for alert in self._recent_alerts:
-                counts[alert.detector] = counts.get(alert.detector, 0) + 1
+        # Lifetime counts from the DB, not the in-memory ring: the ring is empty after
+        # every restart, which would report every detector as never having fired.
+        try:
+            counts = self.db.alert_counts_by_detector()
+        except Exception:  # pragma: no cover - a DB read must never break the report
+            with self._lock:
+                counts = {}
+                for alert in self._recent_alerts:
+                    counts[alert.detector] = counts.get(alert.detector, 0) + 1
         return assess_visibility(
             self._visibility,
             alert_counts=counts,

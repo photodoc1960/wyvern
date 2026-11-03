@@ -124,3 +124,60 @@ def test_declared_host_with_observed_unicast_is_enforceable(mk):
     evs = [mk.syn("192.168.4.60", "18.238.132.5", 443, 1.0, mac="00:11:22:33:44:01")]
     rep = assess_visibility(_counters(evs), alert_counts={}, no_egress_hosts=("192.168.4.60",))
     assert rep.unenforceable_no_egress == ()
+
+
+# ------------------------------------------- flaws found by the first production run
+# The first live run reported beacon, inference_api and stream_timing as dormant while
+# calling port_scan, lateral_movement, credential_spray and ssh_key_injection live —
+# the exact inverse of the truth. Two causes, one test each.
+
+
+def test_a_class_needs_more_than_a_couple_of_devices_to_count_as_visible(mk):
+    """Two of thirty-nine devices is noise, not visibility.
+
+    Live run: 39 devices seen, 2 sources of internal unicast (the monitoring host and
+    the gateway), 1 of egress. The old `>= 2 sources` floor let internal unicast count
+    as visible, so the four intra-LAN detectors — which had raised zero alerts in 48
+    days — were reported live.
+    """
+    evs = [
+        mk.udp(f"192.168.4.{i}", "224.0.0.251", 5353, float(i), mac=f"00:11:22:33:44:{i:02x}")
+        for i in range(10, 49)
+    ]
+    evs.append(mk.syn("192.168.4.60", "192.168.4.1", 443, 1.0, mac="00:11:22:33:44:f0"))
+    evs.append(mk.syn("192.168.4.1", "192.168.4.60", 443, 2.0, mac="00:11:22:33:44:f1"))
+    evs.append(mk.syn("192.168.4.60", "18.238.132.5", 443, 3.0, mac="00:11:22:33:44:f0"))
+    rep = assess_visibility(_counters(evs), alert_counts={}, no_egress_hosts=())
+    assert rep.devices_with_internal_unicast == 2
+    assert rep.scope == "host-only"
+    for d in ("port_scan", "lateral_movement", "credential_spray", "ssh_key_injection"):
+        assert d in rep.dormant, f"{d} must be dormant: 2 of 39 devices is not visibility"
+
+
+def test_a_proportion_of_devices_does_count_as_visible(mk):
+    """A real bridge/router placement sees most devices, and must not be called blind."""
+    evs = []
+    for i in range(10, 40):
+        evs.append(
+            mk.syn(f"192.168.4.{i}", "18.238.132.5", 443, float(i), mac=f"00:11:22:33:44:{i:02x}")
+        )
+    rep = assess_visibility(_counters(evs), alert_counts={}, no_egress_hosts=())
+    assert rep.scope == "egress"
+    assert "zero_egress" not in rep.dormant
+
+
+def test_persisted_alert_history_survives_a_restart(mk):
+    """`alert_counts` must come from durable storage, not from in-memory recent alerts.
+
+    The live run had just restarted, so the in-memory ring was empty and every detector
+    looked like it had never fired — defeating the "evidence beats heuristic" rule for
+    inference_api (344 alerts), stream_timing (7) and beacon (2).
+    """
+    evs = [mk.udp("192.168.4.60", "224.0.0.251", 5353, 1.0, mac="00:11:22:33:44:01")]
+    persisted = {"inference_api": 344, "stream_timing": 7, "beacon": 2}
+    rep = assess_visibility(_counters(evs), alert_counts=persisted, no_egress_hosts=())
+    for d in persisted:
+        assert d not in rep.dormant, f"{d} has fired {persisted[d]} times; it is not dormant"
+    # and the genuinely-blind ones are still named
+    assert "port_scan" in rep.dormant
+    assert "zero_egress" in rep.dormant
