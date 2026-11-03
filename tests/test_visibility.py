@@ -158,7 +158,9 @@ def test_a_proportion_of_devices_does_count_as_visible(mk):
     """A real bridge/router placement sees most devices, and must not be called blind."""
     evs = []
     for i in range(10, 40):
-        evs.append(mk.syn(f"192.168.4.{i}", "18.238.132.5", 443, float(i), mac=f"00:11:22:33:44:{i:02x}"))
+        evs.append(
+            mk.syn(f"192.168.4.{i}", "18.238.132.5", 443, float(i), mac=f"00:11:22:33:44:{i:02x}")
+        )
     rep = assess_visibility(_counters(evs), alert_counts={}, no_egress_hosts=())
     assert rep.scope == "egress"
     assert "zero_egress" not in rep.dormant
