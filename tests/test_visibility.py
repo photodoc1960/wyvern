@@ -181,3 +181,52 @@ def test_persisted_alert_history_survives_a_restart(mk):
     # and the genuinely-blind ones are still named
     assert "port_scan" in rep.dormant
     assert "zero_egress" in rep.dormant
+
+
+def test_devices_are_counted_by_mac_not_by_address(mk):
+    """One device with several addresses must count once.
+
+    Live run: devices_seen reported 381 on a LAN of 92 MACs, because the counters
+    keyed on src_ip and every IPv6 link-local and privacy address counted as its own
+    device. That inflated the visible-share denominator so far that the 25% threshold
+    demanded 95 distinct egress sources on an 87-device network — unreachable, so a
+    fully-visible deployment would have reported every detector dormant forever.
+    """
+    evs = [
+        mk.syn("192.168.4.60", "18.238.132.5", 443, 1.0, mac="00:11:22:33:44:01"),
+        mk.syn("192.168.4.61", "18.238.132.5", 443, 2.0, mac="00:11:22:33:44:01"),
+        mk.syn("192.168.4.62", "18.238.132.5", 443, 3.0, mac="00:11:22:33:44:01"),
+    ]
+    rep = assess_visibility(_counters(evs), alert_counts={}, no_egress_hosts=())
+    assert rep.devices_seen == 1, "three addresses on one MAC is one device"
+    assert rep.devices_with_egress == 1
+
+
+def test_full_egress_visibility_is_credited_on_a_realistic_network(mk):
+    """The case the switch creates: ~87 devices egressing, each with several addresses.
+
+    Must report scope=egress. Under the address-keyed count this produced 87 unicast
+    sources against an inflated denominator and stayed host-only.
+    """
+    evs = []
+    for d in range(87):
+        mac = f"00:11:22:33:{d // 256:02x}:{d % 256:02x}"
+        # each device also chatters on two extra addresses (v6 link-local, privacy)
+        for extra in range(3):
+            evs.append(
+                mk.udp(f"192.168.{extra}.{d % 254 + 1}", "224.0.0.251", 5353, float(d), mac=mac)
+            )
+        evs.append(mk.syn(f"192.168.4.{d % 254 + 1}", "18.238.132.5", 443, float(d), mac=mac))
+    rep = assess_visibility(_counters(evs), alert_counts={}, no_egress_hosts=())
+    assert rep.devices_seen == 87
+    assert rep.scope == "egress", f"full egress visibility must be credited, got {rep.scope}"
+    assert "zero_egress" not in rep.dormant
+
+
+def test_no_egress_enforceability_still_keys_on_the_declared_address(mk):
+    """no_egress_hosts is configured by IP, so that check must stay address-keyed
+    even though device counting moved to MACs."""
+    evs = [mk.syn("192.168.4.60", "18.238.132.5", 443, 1.0, mac="00:11:22:33:44:01")]
+    c = _counters(evs)
+    rep = assess_visibility(c, alert_counts={}, no_egress_hosts=("192.168.4.60", "192.168.4.99"))
+    assert rep.unenforceable_no_egress == ("192.168.4.99",)
