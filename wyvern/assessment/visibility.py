@@ -82,26 +82,42 @@ def classify_event(event: NetworkEvent, internal_cidrs: tuple[str, ...]) -> str:
 
 @dataclass
 class VisibilityCounters:
-    """Mutable tally of observed traffic classes (one per Monitor)."""
+    """Mutable tally of observed traffic classes (one per Monitor).
+
+    Devices are identified by **MAC**, not by address. Keying on `src_ip` counted
+    every IPv6 link-local and privacy address as its own device — 381 of them on a
+    LAN of 92 — which inflated the denominator of the visible-share test until it
+    demanded more sources than the network contains, so a fully-visible deployment
+    would have reported every detector dormant forever.
+
+    Addresses are tracked separately, because `no_egress_hosts` is configured by
+    address and its enforceability has to be checked against what was declared.
+    """
 
     counts: dict[str, int] = field(default_factory=dict)
-    unicast_sources: set[str] = field(default_factory=set)
-    egress_sources: set[str] = field(default_factory=set)
-    internal_unicast_sources: set[str] = field(default_factory=set)
-    all_sources: set[str] = field(default_factory=set)
+    unicast_devices: set[str] = field(default_factory=set)
+    egress_devices: set[str] = field(default_factory=set)
+    internal_unicast_devices: set[str] = field(default_factory=set)
+    all_devices: set[str] = field(default_factory=set)
+    # Addresses observed sending unicast — used only for no_egress_hosts checks.
+    unicast_addrs: set[str] = field(default_factory=set)
 
     def observe(self, event: NetworkEvent, internal_cidrs: tuple[str, ...]) -> str:
         cls = classify_event(event, internal_cidrs)
         self.counts[cls] = self.counts.get(cls, 0) + 1
-        src = getattr(event, "src_ip", None) or getattr(event, "src_mac", None)
-        if src:
-            self.all_sources.add(src)
+        addr = getattr(event, "src_ip", None)
+        # MAC first: one device with several addresses must count once.
+        device = getattr(event, "src_mac", None) or addr
+        if device:
+            self.all_devices.add(device)
             if cls == CLASS_INTERNAL_UNICAST:
-                self.unicast_sources.add(src)
-                self.internal_unicast_sources.add(src)
+                self.unicast_devices.add(device)
+                self.internal_unicast_devices.add(device)
             elif cls == CLASS_EGRESS:
-                self.unicast_sources.add(src)
-                self.egress_sources.add(src)
+                self.unicast_devices.add(device)
+                self.egress_devices.add(device)
+        if addr and cls in (CLASS_INTERNAL_UNICAST, CLASS_EGRESS):
+            self.unicast_addrs.add(addr)
         return cls
 
 
@@ -150,10 +166,10 @@ def assess_visibility(
     # lenient: a live run saw 39 devices with internal unicast from just 2 of them (the
     # capture host and the gateway) and duly reported the four intra-LAN detectors as
     # live, when they had raised zero alerts in 48 days. Two of thirty-nine is noise.
-    seen = len(counters.all_sources)
+    seen = len(counters.all_devices)
     need = max(_MIN_SOURCES, int(seen * _MIN_SOURCE_FRACTION))
-    multi_internal = len(counters.internal_unicast_sources) >= need
-    multi_egress = len(counters.egress_sources) >= need
+    multi_internal = len(counters.internal_unicast_devices) >= need
+    multi_egress = len(counters.egress_devices) >= need
     if multi_internal and multi_egress:
         scope = "lan"
     elif multi_egress:
@@ -178,15 +194,15 @@ def assess_visibility(
     )
     # A declaration is unenforceable unless that host's own unicast traffic has
     # been seen — zero_egress can only fire on traffic that reaches the sensor.
-    unenforceable = tuple(sorted(h for h in no_egress_hosts if h not in counters.unicast_sources))
+    unenforceable = tuple(sorted(h for h in no_egress_hosts if h not in counters.unicast_addrs))
     return VisibilityReport(
         scope=scope,
         note=_SCOPE_NOTES[scope],
         counts=dict(counters.counts),
-        devices_seen=len(counters.all_sources),
-        devices_with_unicast=len(counters.unicast_sources),
-        devices_with_egress=len(counters.egress_sources),
-        devices_with_internal_unicast=len(counters.internal_unicast_sources),
+        devices_seen=len(counters.all_devices),
+        devices_with_unicast=len(counters.unicast_devices),
+        devices_with_egress=len(counters.egress_devices),
+        devices_with_internal_unicast=len(counters.internal_unicast_devices),
         dormant=dormant,
         unenforceable_no_egress=unenforceable,
     )
