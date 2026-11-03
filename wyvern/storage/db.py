@@ -200,6 +200,20 @@ class WyvernDB:
             "alerts_by_severity": {Severity(k).label: v for k, v in by_sev.items()},
         }
 
+    def alert_counts_by_detector(self) -> dict[str, int]:
+        """Lifetime alert count per detector.
+
+        Used by the visibility report to tell a structurally-blind detector from one
+        that simply has not fired recently. The in-memory ring buffer cannot answer
+        that: it is empty after every restart, which made every detector look as
+        though it had never fired.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT detector, COUNT(*) FROM alerts GROUP BY detector"
+            ).fetchall()
+        return {r[0]: r[1] for r in rows}
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()
