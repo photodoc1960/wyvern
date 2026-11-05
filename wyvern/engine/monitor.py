@@ -27,6 +27,7 @@ from ..assessment.visibility import VisibilityCounters, assess_visibility
 from ..baseline.learner import BaselineLearner
 from ..baseline.store import load_baselines, save_baselines
 from ..capture.decode import decode_frame
+from ..capture.stats import CaptureStats, accumulate, summarize
 from ..config import Config
 from ..detectors.base import DetectorContext
 from ..detectors.loader import default_detectors, make_correlator
@@ -100,6 +101,10 @@ class Monitor:
         # Which traffic classes actually reach this capture point. Without this a
         # clean dashboard is indistinguishable from a blind sensor.
         self._visibility = VisibilityCounters()
+        # Packets the kernel offered vs. packets we failed to take. Unread, loss
+        # looks identical to a quiet network.
+        self._capture = CaptureStats()
+        self._capture_seen = False
 
         saved = load_baselines(config.baseline_path)
         if saved:
@@ -335,10 +340,17 @@ class Monitor:
                 counts = {}
                 for alert in self._recent_alerts:
                     counts[alert.detector] = counts.get(alert.detector, 0) + 1
+        with self._lock:
+            cap = self._capture if self._capture_seen else None
+        # Only report capture health when capture is actually running: for an
+        # offline replay there is no socket, and "counters unavailable" would be
+        # noise rather than a finding.
+        live = getattr(self, "_sniffer", None) is not None
         return assess_visibility(
             self._visibility,
             alert_counts=counts,
             no_egress_hosts=self.config.no_egress_hosts,
+            capture=summarize(cap) if live else None,
         )
 
     def stats(self) -> dict:
@@ -390,6 +402,24 @@ class Monitor:
                 self.sweep()
             except Exception:  # noqa: BLE001
                 log.warning("sweep failed", exc_info=True)
+            self._poll_capture_stats()
+
+    def _poll_capture_stats(self) -> None:
+        """Fold the capture socket's drop counters into the running totals."""
+        sniffer = getattr(self, "_sniffer", None)
+        if sniffer is None or not hasattr(sniffer, "poll_stats"):
+            return
+        try:
+            delta = sniffer.poll_stats()
+        except Exception:  # noqa: BLE001 - never let accounting break capture
+            log.debug("capture stats poll failed", exc_info=True)
+            return
+        if delta is None:
+            return
+        packets, drops = delta
+        with self._lock:
+            self._capture = accumulate(self._capture, packets=packets, drops=drops)
+            self._capture_seen = True
 
     def replay(self, pcap_path: str, *, realtime: bool = False, speed: float = 1.0) -> int:
         from ..capture.sniffer import replay_pcap
