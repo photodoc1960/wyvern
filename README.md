@@ -249,8 +249,9 @@ settings are **off by default**:
   which device Wyvern *would* quarantine. With `responder: firewall`, it runs your own
   `firewall_quarantine_cmd` / `firewall_release_cmd` templates (no shell) against the
   device named by a CRITICAL `worm_signature` verdict — never on a single detector.
-  `mode: confirm` records the action as pending until it is approved; `mode: auto`
-  applies it immediately and should be treated as experimental. Protected assets (the
+  `mode: confirm` records the action as pending for a human to approve, but approval
+  is not yet exposed in the CLI or dashboard, so today it behaves like `observe`.
+  `mode: auto` applies it immediately and should be treated as experimental. Protected assets (the
   gateway, DNS, the sensor itself and anything in `protected_hosts`) are never
   actioned, a circuit breaker caps actions per window, and every quarantine expires
   after `quarantine_ttl_s`.
