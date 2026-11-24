@@ -13,6 +13,10 @@ something fires.
 | 🟠 High | strong single signal **or** 2 worm stages on one device | investigate now |
 | 🔴 Critical | confirmed worm-grade behaviour / 3+ stages | **isolate & investigate immediately** |
 
+Repeats of the same alert don't raise a device's level: the score counts each
+distinct signal once, at its strongest severity. What escalates a device is
+*different* behaviours (and worm stages) seen together.
+
 The dashboard banner shows the **overall** level and the **likely-compromised
 device**. A 🔴 banner naming a device is your top priority.
 
