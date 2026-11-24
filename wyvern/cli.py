@@ -7,6 +7,8 @@ Commands
 * ``simulate`` — run the synthetic Toronto-worm scenario (demo / no privileges).
 * ``report``   — print the current threat assessment from the stored data.
 * ``export``   — write a forensic bundle (JSON) or alert CSV.
+* ``quarantine`` — list response-engine quarantines; approve or release one
+  (``response.mode: confirm``) through the running monitor.
 """
 
 from __future__ import annotations
@@ -18,6 +20,8 @@ import sys
 
 from . import __version__
 from .config import Config, ConfigError
+
+_QSTATES = ("proposed", "pending", "active", "failed", "expired", "released")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -52,6 +56,21 @@ def _build_parser() -> argparse.ArgumentParser:
     e = sub.add_parser("export", help="export forensic data")
     e.add_argument("out", help="output file path")
     e.add_argument("--format", choices=["json", "csv"], default="json")
+
+    q = sub.add_parser("quarantine", help="list, approve or release response-engine quarantines")
+    qsub = q.add_subparsers(dest="action", required=True)
+    ql = qsub.add_parser("list", help="list quarantine records, newest first")
+    ql.add_argument("--status", choices=_QSTATES, help="only records in this state")
+    for name, help_ in (
+        ("approve", "apply a PENDING quarantine (confirm mode)"),
+        ("release", "lift an applied quarantine, or dismiss a pending one"),
+    ):
+        qa = qsub.add_parser(name, help=help_)
+        qa.add_argument("id", help="quarantine record id (see 'wyvern quarantine list')")
+        qa.add_argument(
+            "--url",
+            help="the running monitor's dashboard URL (default: http://127.0.0.1:<web_port>)",
+        )
     return p
 
 
@@ -94,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report(cfg)
     if args.command == "export":
         return _cmd_export(cfg, args)
+    if args.command == "quarantine":
+        return _cmd_quarantine(cfg, args)
     return 1
 
 
@@ -244,6 +265,98 @@ def _cmd_export(cfg: Config, args) -> int:
             generated_at=time.time(),
         )
     print(f"exported {args.format} -> {path}")
+    return 0
+
+
+def _cmd_quarantine(cfg: Config, args) -> int:
+    if args.action == "list":
+        return _quarantine_list(cfg, args.status)
+    return _quarantine_action(cfg, args.action, args.id, args.url)
+
+
+def _quarantine_list(cfg: Config, status: str | None) -> int:
+    import os
+
+    from .response import QuarantineRecord
+    from .storage.db import WyvernDB
+
+    if not os.path.exists(cfg.db_path):
+        print("No quarantine records.")
+        return 0
+    records = [QuarantineRecord.from_row(r) for r in WyvernDB(cfg.db_path).load_quarantines()]
+    if status:
+        records = [r for r in records if r.status == status]
+    if not records:
+        print("No quarantine records.")
+        return 0
+    records.sort(key=lambda r: r.proposed_at, reverse=True)
+    print(
+        f"{'ID':<12}  {'STATUS':<8}  {'MODE':<7}  {'TARGET':<17}  {'IP':<15}  "
+        f"{'PROPOSED':<19}  EXPIRES"
+    )
+    for r in records:
+        print(
+            f"{r.id:<12}  {r.status:<8}  {r.mode:<7}  {r.target:<17}  {r.ip or '':<15}  "
+            f"{_fmt_ts(r.proposed_at):<19}  {_fmt_ts(r.expires_at)}"
+        )
+    return 0
+
+
+def _fmt_ts(ts: float | None) -> str:
+    import time
+
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else ""
+
+
+def _quarantine_action(cfg: Config, action: str, record_id: str, url: str | None) -> int:
+    """Approve/release through the running monitor's local API.
+
+    The monitor owns the live quarantine state, the responder and the approval
+    circuit breaker, so the CLI asks it to act rather than editing the DB behind
+    its back.
+    """
+    import json
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    if url is None:
+        host = cfg.web_host if cfg.web_host not in ("0.0.0.0", "::", "") else "127.0.0.1"
+        host = f"[{host}]" if ":" in host else host
+        url = f"http://{host}:{cfg.web_port}"
+    if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+        print(f"--url must be an http(s) URL, got {url!r}", file=sys.stderr)
+        return 2
+    endpoint = (
+        f"{url.rstrip('/')}/api/quarantines/{urllib.parse.quote(record_id, safe='')}/{action}"
+    )
+    req = urllib.request.Request(
+        endpoint, data=b"{}", method="POST", headers={"Content-Type": "application/json"}
+    )
+    # Talk to the monitor directly: never route a loopback request via http_proxy.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(req, timeout=30) as resp:
+            body = json.loads(resp.read() or b"{}")
+    except urllib.error.HTTPError as exc:
+        try:
+            body = json.loads(exc.read() or b"{}")
+        except ValueError:
+            body = {}
+        print(f"{action} refused: {body.get('error') or exc.reason}", file=sys.stderr)
+        return 1
+    except (urllib.error.URLError, OSError) as exc:
+        print(
+            f"could not reach the monitor at {url} ({exc}).\n"
+            "Quarantines are approved/released by the running 'wyvern monitor' through its "
+            "dashboard API; start it with the dashboard enabled, or pass --url.",
+            file=sys.stderr,
+        )
+        return 1
+    rec = body.get("record", {})
+    print(
+        f"quarantine {rec.get('id', record_id)} ({rec.get('target', '?')}) -> {rec.get('status')}"
+    )
     return 0
 
 

@@ -4,6 +4,22 @@ All notable changes to Wyvern are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/); releases are cut roughly monthly
 and track new public threat research.
 
+## [Unreleased]
+
+### Added
+- **Confirm-mode approval and release.** `response.mode: confirm` now works: approve
+  a pending quarantine, or release/dismiss one, from the dashboard's *Response engine*
+  panel, with `wyvern quarantine list|approve|release`, or via
+  `GET /api/quarantines` and `POST /api/quarantines/<id>/approve|release`. Approval
+  re-checks the severity threshold, protected hosts and an approval circuit breaker
+  against the current config. The write endpoints accept only loopback, JSON,
+  same-origin requests. Quarantine records now store the verdict's severity (the DB
+  column is added automatically).
+
+### Changed
+- Releasing a quarantine whose release command fails now leaves it active (and says
+  so) instead of marking it released while the rule may still be in place.
+
 ## [0.2.0] — 2026-11-24
 
 Five months of dogfooding and monthly threat-research updates. The headline changes

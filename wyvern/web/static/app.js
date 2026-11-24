@@ -152,6 +152,41 @@ function renderDevices(list) {
   });
 }
 
+function renderQuarantines(list) {
+  $("#quarantine-panel").hidden = !list.length;
+  $("#quarantines tbody").innerHTML = list.map((q) => {
+    const live = ["proposed", "pending", "active", "failed"].includes(q.status);
+    const buttons = [
+      q.status === "pending" ? `<button class="q-act approve" data-act="approve" data-id="${escapeHtml(q.id)}">approve</button>` : "",
+      live ? `<button class="q-act" data-act="release" data-id="${escapeHtml(q.id)}">${q.status === "active" ? "release" : "dismiss"}</button>` : "",
+    ].join("");
+    return `<tr>
+      <td>${escapeHtml(q.status)}</td><td>${escapeHtml(q.target)}</td><td>${escapeHtml(q.ip || "")}</td>
+      <td>${escapeHtml(q.mode)}</td><td>${fmtTime(q.proposed_at)}</td><td>${fmtTime(q.expires_at)}</td>
+      <td>${buttons}</td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll(".q-act").forEach((btn) => {
+    btn.onclick = () => quarantineAction(btn.dataset.act, btn.dataset.id);
+  });
+}
+async function quarantineAction(act, id) {
+  const prompt = act === "approve"
+    ? "Approve this quarantine? Wyvern will run your configured quarantine command now."
+    : "Release this quarantine?";
+  if (!window.confirm(prompt)) return;
+  let msg;
+  try {
+    const res = await post(`/api/quarantines/${encodeURIComponent(id)}/${act}`, {});
+    msg = res.ok ? `${act}d: ${res.record.target} is now ${res.record.status}` : `${act} refused: ${res.error}`;
+  } catch (e) { msg = `${act} failed: ${e}`; }
+  $("#quarantine-msg").textContent = msg;
+  refreshQuarantines();
+}
+async function refreshQuarantines() {
+  try { renderQuarantines(await api("/api/quarantines")); } catch (e) { /* ignore transient */ }
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -167,6 +202,7 @@ async function refreshAll() {
     renderBanner(await api("/api/assessment"));
     renderAlerts(await api("/api/alerts?limit=100"));
     await refreshDevices();
+    await refreshQuarantines();
   } catch (e) { console.warn(e); }
 }
 
@@ -183,11 +219,13 @@ function connectStream() {
     if (msg.type === "assessment") renderBanner(msg.assessment);
     else if (msg.type === "alert") { prependAlert(msg.alert); debouncedRefresh(); }
     else if (msg.type === "device_update") debouncedRefresh();
+    else if (msg.type === "quarantine_update") refreshQuarantines();
   };
   es.onerror = () => { /* EventSource auto-reconnects */ };
 }
 async function refreshStatsAndDevices() {
-  try { renderStats(await api("/api/stats")); await refreshDevices(); } catch (e) {}
+  // An alert may also have produced a quarantine record, so refresh those too.
+  try { renderStats(await api("/api/stats")); await refreshDevices(); await refreshQuarantines(); } catch (e) {}
 }
 function prependAlert(a) {
   const ul = $("#alerts");

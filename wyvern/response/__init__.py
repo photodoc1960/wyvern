@@ -8,10 +8,11 @@ in later phases behind the same safety gates.
 from __future__ import annotations
 
 from .engine import ResponseEngine, build_response_engine
-from .models import Decision, QState, QuarantineRecord, ResponseDecision
+from .models import ActionRefusedError, Decision, QState, QuarantineRecord, ResponseDecision
 from .store import QuarantineStore
 
 __all__ = [
+    "ActionRefusedError",
     "ResponseEngine",
     "build_response_engine",
     "QuarantineStore",

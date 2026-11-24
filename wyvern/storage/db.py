@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS quarantines (
     expires_at  REAL,
     alert_id    TEXT,
     stage_count INTEGER,
+    severity    INTEGER,
     released_at REAL,
     ip          TEXT,
     mac         TEXT
@@ -73,6 +74,7 @@ _QUARANTINE_COLS = (
     "expires_at",
     "alert_id",
     "stage_count",
+    "severity",
     "released_at",
     "ip",
     "mac",
@@ -87,9 +89,16 @@ class WyvernDB:
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.executescript(_SCHEMA)
+            self._migrate()
             if path != ":memory:":
                 self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a table was first created (idempotent)."""
+        have = {r["name"] for r in self._conn.execute("PRAGMA table_info(quarantines)")}
+        if "severity" not in have:
+            self._conn.execute("ALTER TABLE quarantines ADD COLUMN severity INTEGER")
 
     # ------------------------------------------------------------- writes
     def insert_alert(self, alert: Alert) -> None:
