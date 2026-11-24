@@ -11,8 +11,13 @@ leaves a distinctive *inter-packet timing* rhythm (~tens of ms between tokens)
 on the streamed response, detectable through TLS **without any decryption** —
 timing metadata only. This detector measures that cadence on long-lived HTTPS
 response streams and emits a deliberately *weak, corroborating* signal. It is
-never a standalone verdict: the worm-signature correlator only lets it reinforce
-an existing ``inference_proxy`` finding (see ``worm_signature.py``).
+never a standalone alert: its ``inference_timing`` stage is in ``HINT_STAGES``,
+so the Monitor feeds it to the worm-signature correlator but never surfaces it
+on its own. The correlator only lets it reinforce an existing
+``inference_proxy`` finding (see ``worm_signature.py``). Non-LLM streams with a
+similar cadence (SSE dashboards, tickers, tailed logs) can match the bands, and
+providers increasingly batch tokens server-side so the rhythm never reaches the
+wire (issue #61) — both reasons it must not stand alone.
 
 Like the beacon detector, periodicity only emerges over time, so this is a
 sweep detector: ``inspect`` accumulates per-flow arrival timestamps and

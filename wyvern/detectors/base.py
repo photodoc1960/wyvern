@@ -79,14 +79,28 @@ def peer_id(event: NetworkEvent, ctx: DetectorContext) -> str | None:
     return dst
 
 
-class Cooldown:
-    """Per-key debounce so a sustained condition alerts once, not every packet."""
+_COOLDOWN_PRUNE_FLOOR = 1024
 
-    __slots__ = ("seconds", "_last")
+
+class Cooldown:
+    """Per-key debounce so a sustained condition alerts once, not every packet.
+
+    Expired entries are dropped as the table grows. An expired entry and a
+    missing one mean the same thing (ready to fire), so pruning never changes
+    behaviour — it only stops a long-running sensor that sees many distinct
+    flows or devices from growing the table without bound. Pruning runs when the
+    table doubles past its last pruned size, so its cost is amortised O(1).
+    """
+
+    __slots__ = ("seconds", "_last", "_next_prune")
 
     def __init__(self, seconds: float) -> None:
         self.seconds = seconds
         self._last: dict[object, float] = {}
+        self._next_prune = _COOLDOWN_PRUNE_FLOOR
+
+    def __len__(self) -> int:
+        return len(self._last)
 
     def ready(self, key: object, now: float) -> bool:
         last = self._last.get(key)
@@ -94,6 +108,15 @@ class Cooldown:
 
     def stamp(self, key: object, now: float) -> None:
         self._last[key] = now
+        if len(self._last) >= self._next_prune:
+            self.prune(now)
+            self._next_prune = max(_COOLDOWN_PRUNE_FLOOR, 2 * len(self._last))
+
+    def prune(self, now: float) -> None:
+        """Forget keys whose cooldown has elapsed."""
+        horizon = now - self.seconds
+        for key in [k for k, last in self._last.items() if last <= horizon]:
+            del self._last[key]
 
     def fire(self, key: object, now: float) -> bool:
         """Convenience: return True (and stamp) iff the cooldown has elapsed."""

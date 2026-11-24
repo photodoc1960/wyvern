@@ -139,9 +139,11 @@ def _decode_tcp(
         app = _parse_http_or_tls(payload, ts, src_ip, dst_ip, dport, src_mac)
         if app is not None:
             events.append(app)
-        # Surface data-bearing HTTPS segments (metadata only) so the stream-timing
-        # detector can measure inter-packet cadence on the response direction.
-        if dport in _STREAM_PORTS or sport in _STREAM_PORTS:
+        # Surface data-bearing HTTPS *response* segments (server:443 -> client,
+        # metadata only) so the stream-timing detector can measure their cadence.
+        # Request-direction segments carry no token rhythm, so they are never
+        # created — this path is high-volume.
+        if sport in _STREAM_PORTS:
             events.append(
                 StreamSegmentEvent(
                     ts=ts,
@@ -150,7 +152,7 @@ def _decode_tcp(
                     dst_port=dport,
                     src_port=sport,
                     payload_len=len(payload),
-                    to_client=sport in _STREAM_PORTS,
+                    to_client=True,
                     src_mac=src_mac,
                     dst_mac=dst_mac,
                 )

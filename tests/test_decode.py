@@ -93,6 +93,17 @@ def test_decode_https_data_yields_stream_segment():
     assert seg.src_port == 443 and seg.to_client is True and seg.payload_len == 120
 
 
+def test_decode_https_request_direction_has_no_stream_segment():
+    # Client -> server:443 data carries no token cadence, so no timing sample is
+    # created on the high-volume path (issue #17).
+    tcp = dpkt.tcp.TCP(
+        sport=51000, dport=443, flags=dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK, data=b"x" * 120
+    )
+    ip = dpkt.ip.IP(src=A, dst=B, p=dpkt.ip.IP_PROTO_TCP, ttl=64, data=tcp)
+    evs = decode_frame(_eth(ip, dpkt.ethernet.ETH_TYPE_IP), 1.0)
+    assert not any(isinstance(e, StreamSegmentEvent) for e in evs)
+
+
 def test_decode_https_syn_has_no_stream_segment():
     # A bare SYN carries no payload -> ConnEvent only, no timing sample.
     tcp = dpkt.tcp.TCP(sport=51000, dport=443, flags=dpkt.tcp.TH_SYN, win=64240)
