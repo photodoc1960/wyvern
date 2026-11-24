@@ -11,6 +11,8 @@ import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 
+from ..util.nets import is_link_local
+
 
 class DeviceRole(str, Enum):
     UNKNOWN = "unknown"
@@ -73,7 +75,12 @@ class Device:
             return self.evolve(last_seen=max(self.last_seen, ts))
         # Keep only the most recent handful of IPs (bounds DHCP-churn growth).
         ips = self.ips if ip in self.ips else (*self.ips, ip)[-8:]
-        return self.evolve(ip=ip, ips=ips, last_seen=max(self.last_seen, ts))
+        # A link-local address is recorded but never displaces a routable primary
+        # address: the device is still "192.168.7.136", not "fe80::…" (issue #41).
+        primary = ip
+        if self.ip and is_link_local(ip) and not is_link_local(self.ip):
+            primary = self.ip
+        return self.evolve(ip=primary, ips=ips, last_seen=max(self.last_seen, ts))
 
     def with_open_port(self, port: int) -> Device:
         if port in self.open_ports:

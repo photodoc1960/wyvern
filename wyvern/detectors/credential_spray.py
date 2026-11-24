@@ -16,7 +16,7 @@ from ..indicators import auth_service, is_auth_port
 from ..models.alert import Alert, Severity
 from ..models.events import ConnEvent, NetworkEvent
 from ..util.timewindow import KeyedWindows
-from .base import Cooldown, Detector, DetectorContext, clamp01, source_id
+from .base import Cooldown, Detector, DetectorContext, clamp01, peer_id, source_id
 
 
 class CredentialSprayDetector(Detector):
@@ -44,7 +44,8 @@ class CredentialSprayDetector(Detector):
         service = auth_service(event.dst_port) or "auth"
 
         # --- reuse across hosts ---
-        hwin = self._hosts.add(sid, event.ts, event.dst_ip)
+        peer = peer_id(event, ctx)
+        hwin = self._hosts.add(sid, event.ts, peer)
         hosts = hwin.distinct(event.ts)
         if len(hosts) >= self.t.cred_distinct_hosts and self._spray_cool.fire(sid, event.ts):
             confidence = clamp01(
@@ -75,7 +76,7 @@ class CredentialSprayDetector(Detector):
             )
 
         # --- repeated attempts on one host (failed-auth shadow) ---
-        rkey = (sid, event.dst_ip, event.dst_port)
+        rkey = (sid, peer, event.dst_port)
         rwin = self._reconnects.add(rkey, event.ts, event.ts)
         if rwin.count(event.ts) >= self.t.cred_fail_reconnects and self._fail_cool.fire(
             rkey, event.ts
