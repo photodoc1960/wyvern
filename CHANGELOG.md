@@ -4,7 +4,11 @@ All notable changes to Wyvern are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/); releases are cut roughly monthly
 and track new public threat research.
 
-## [Unreleased]
+## [0.2.1] — 2026-11-24
+
+Same-day follow-up to 0.2.0. It corrects a safeguard 0.2.0 described but did not
+deliver (quarantine auto-release), makes `mode: confirm` usable, and stops a chatty
+detector from rating a device Critical on repetition alone.
 
 ### Added
 - **Confirm-mode approval and release.** `response.mode: confirm` now works: approve
@@ -27,6 +31,10 @@ and track new public threat research.
   rules and expires stale requests.
 - The dashboard and `wyvern quarantine list` show a request past its TTL as expired
   (no approve button), and the response panel shows dates, not just times.
+- **Repeated alerts no longer add up to Critical** (#68). The per-device threat score
+  counted every alert, so one detector re-firing all hour could rate a device Critical
+  with no worm stages. Each distinct signal (detector + stage) now counts once, at its
+  strongest severity; different behaviours seen together still escalate.
 
 ## [0.2.0] — 2026-11-24
 
@@ -115,5 +123,6 @@ Initial public release.
 - 120+ tests, ~88% line coverage; full docs (threat model, design, deployment,
   alert playbook, contributing).
 
+[0.2.1]: https://github.com/photodoc1960/wyvern/releases/tag/v0.2.1
 [0.2.0]: https://github.com/photodoc1960/wyvern/releases/tag/v0.2.0
 [0.1.0]: https://github.com/photodoc1960/wyvern/releases/tag/v0.1.0

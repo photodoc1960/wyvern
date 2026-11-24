@@ -4,8 +4,8 @@
 [![Docker](https://github.com/photodoc1960/wyvern/actions/workflows/docker.yml/badge.svg)](https://github.com/photodoc1960/wyvern/actions/workflows/docker.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Tests](https://img.shields.io/badge/tests-260-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-313-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)
 
 Wyvern is a **passive, read-only** network monitor and anomaly detector for home
 and small-office LANs. It watches internal traffic, tracks every device, learns
