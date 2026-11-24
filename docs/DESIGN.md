@@ -41,7 +41,7 @@ detection pipeline runs without a live interface or root.
 | `indicators.py` | shared predicates over the worm-intelligence constants |
 | `tracking/` | `DeviceRegistry` + passive OS/role fingerprinting |
 | `baseline/` | per-device behavioural learning + JSON persistence |
-| `detectors/` | 8 stage detectors + `worm_signature` correlator |
+| `detectors/` | 10 stage detectors + `worm_signature` correlator |
 | `assessment/` | threat scoring + manual remediation mapping |
 | `storage/` | SQLite store, append-only JSONL log, exporters |
 | `alerting/` | desktop notifications + optional email digest |
