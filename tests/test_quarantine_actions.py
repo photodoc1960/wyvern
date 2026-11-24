@@ -372,9 +372,10 @@ def _seed_db(tmp_path) -> list[QuarantineRecord]:
     cfg = Config(data_dir=str(tmp_path)).validate()
     cfg.ensure_data_dir()
     eng = build_response_engine(ResponsePolicy(mode="confirm"), db=WyvernDB(cfg.db_path))
-    pending = _pending(eng, ts=1000.0)
+    now = time.time()  # current stamps: a 1970 request would list as expired
+    pending = _pending(eng, ts=now - 200)
     released = eng.store.release(
-        _pending(eng, ts=2000.0, ip="192.168.1.67", mac="00:11:22:33:44:67").id, now=2100.0
+        _pending(eng, ts=now - 100, ip="192.168.1.67", mac="00:11:22:33:44:67").id, now=now
     )
     return [pending, released]
 
@@ -450,3 +451,73 @@ def test_cli_action_without_running_monitor(tmp_path, capsys):
 def test_cli_rejects_non_http_url(tmp_path, capsys):
     rc = main(["--data-dir", str(tmp_path), "quarantine", "release", "a", "--url", "file:///x"])
     assert rc == 2
+
+
+# ------------------------------------------------------------- TTL enforcement
+def test_sweep_expires_stale_pending_request(web):
+    # The TTL used to take effect only at restart: a running monitor left an
+    # unapproved request "pending" (with a live approve button) forever.
+    mon, resp, rec, client = web
+    q = mon.bus.subscribe()
+    mon.sweep(now=rec.expires_at + 1)
+    assert mon.response.store.get(rec.id).status == QState.EXPIRED
+    assert resp.reverted == []  # nothing was ever applied, so nothing to revert
+    updates = []
+    while not q.empty():
+        msg = q.get_nowait()
+        if msg["type"] == "quarantine_update":
+            updates.append(msg["quarantine"]["status"])
+    assert updates == ["expired"]  # the dashboard is told to refresh
+    assert client.get("/api/quarantines").get_json()[0]["status"] == "expired"
+
+
+def test_sweep_reverts_applied_quarantine_at_ttl(web):
+    # The documented auto-release: an applied rule must come off at its TTL
+    # while the monitor is running, not at the next restart.
+    mon, resp, rec, _client = web
+    mon.approve_quarantine(rec.id)
+    assert mon.response.store.get(rec.id).status == QState.ACTIVE
+    mon.sweep(now=rec.expires_at + 1)
+    assert resp.reverted == [MAC]
+    assert mon.response.store.get(rec.id).status == QState.EXPIRED
+    assert mon.db.load_quarantines()[0]["status"] == "expired"  # persisted
+
+
+def test_sweep_leaves_unexpired_quarantine_alone(web):
+    mon, resp, rec, _client = web
+    mon.sweep(now=rec.expires_at - 1)
+    assert mon.response.store.get(rec.id).status == QState.PENDING
+    assert resp.reverted == []
+
+
+def test_sweep_survives_expiry_failure(web, monkeypatch):
+    mon, _resp, _rec, _client = web
+
+    def boom(now):
+        raise RuntimeError("store unavailable")
+
+    monkeypatch.setattr(mon.response, "sweep_expired", boom)
+    mon.sweep(now=time.time())  # must not raise
+
+
+def test_lapsed_only_for_never_applied_requests_past_ttl():
+    eng = _confirm_engine()
+    rec = _pending(eng, ts=1000.0)
+    assert not rec.lapsed(rec.expires_at - 1)
+    assert rec.lapsed(rec.expires_at)
+    active = replace(rec, status=QState.ACTIVE)
+    assert not active.lapsed(rec.expires_at + 1)  # a rule still in place is not "expired"
+
+
+def test_cli_list_shows_lapsed_request_as_expired(tmp_path, capsys):
+    # No monitor running means no sweep; the CLI must not list a request whose
+    # TTL has passed as pending.
+    cfg = Config(data_dir=str(tmp_path)).validate()
+    cfg.ensure_data_dir()
+    eng = build_response_engine(ResponsePolicy(mode="confirm"), db=WyvernDB(cfg.db_path))
+    stale = _pending(eng, ts=1000.0)
+    assert main(["--data-dir", str(tmp_path), "quarantine", "list"]) == 0
+    line = next(ln for ln in capsys.readouterr().out.splitlines() if stale.id in ln)
+    assert "expired" in line and "pending" not in line
+    assert main(["--data-dir", str(tmp_path), "quarantine", "list", "--status", "pending"]) == 0
+    assert stale.id not in capsys.readouterr().out

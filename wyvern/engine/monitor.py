@@ -199,6 +199,7 @@ class Monitor:
         for alert in surfaced:
             self._emit(alert)
 
+        self._expire_quarantines(now)
         self._persist_devices()
         try:
             save_baselines(self.baseline.snapshot(), self.config.baseline_path)
@@ -417,6 +418,24 @@ class Monitor:
             rec = self.response.release(record_id, now=time.time())
         log.warning("quarantine %s for %s released", rec.id, rec.target)
         return self._publish_quarantine(rec)
+
+    def _expire_quarantines(self, now: float) -> None:
+        """Enforce the quarantine TTL: revert past-TTL rules and expire stale requests.
+
+        Without this the TTL only took effect at the next restart (reconciliation),
+        so an applied quarantine outlived ``quarantine_ttl_s`` indefinitely and an
+        unapproved request stayed "pending" forever. ``now`` is the sweep's clock —
+        wall time when live, capture time during replay — matching the clock the
+        records were stamped with.
+        """
+        try:
+            expired = self.response.sweep_expired(now)
+        except Exception:  # noqa: BLE001 - expiry must not break the sweep
+            log.warning("quarantine expiry sweep failed", exc_info=True)
+            return
+        for rec in expired:
+            log.warning("quarantine %s for %s expired", rec.id, rec.target)
+            self._publish_quarantine(rec)
 
     def _publish_quarantine(self, rec: QuarantineRecord) -> dict:
         row = rec.to_row()

@@ -276,14 +276,20 @@ def _cmd_quarantine(cfg: Config, args) -> int:
 
 def _quarantine_list(cfg: Config, status: str | None) -> int:
     import os
+    import time
+    from dataclasses import replace
 
-    from .response import QuarantineRecord
+    from .response import QState, QuarantineRecord
     from .storage.db import WyvernDB
 
     if not os.path.exists(cfg.db_path):
         print("No quarantine records.")
         return 0
     records = [QuarantineRecord.from_row(r) for r in WyvernDB(cfg.db_path).load_quarantines()]
+    # The database is only swept while a monitor runs; don't list a request as
+    # pending when its TTL has passed and approval would be refused.
+    now = time.time()
+    records = [replace(r, status=QState.EXPIRED) if r.lapsed(now) else r for r in records]
     if status:
         records = [r for r in records if r.status == status]
     if not records:

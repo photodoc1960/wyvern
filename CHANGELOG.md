@@ -20,6 +20,14 @@ and track new public threat research.
 - Releasing a quarantine whose release command fails now leaves it active (and says
   so) instead of marking it released while the rule may still be in place.
 
+### Fixed
+- **Quarantine TTL is now enforced while the monitor runs.** Expiry only happened at
+  restart, so an applied quarantine stayed in force past `quarantine_ttl_s` and an
+  unapproved request stayed "pending" indefinitely. Every sweep now reverts past-TTL
+  rules and expires stale requests.
+- The dashboard and `wyvern quarantine list` show a request past its TTL as expired
+  (no approve button), and the response panel shows dates, not just times.
+
 ## [0.2.0] — 2026-11-24
 
 Five months of dogfooding and monthly threat-research updates. The headline changes
