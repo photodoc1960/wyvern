@@ -29,16 +29,23 @@ It is built with **scapy** (capture), **dpkt** (analysis) and **Flask**
 
 ## ⚖️ What Wyvern will and won't do
 
-Wyvern **only observes, alerts, and recommends.** By design it will **never**:
+By default Wyvern **only observes, alerts, and recommends.** Out of the box it will
+**never**:
 
 - modify any device, kill a process, or delete a file;
 - change network settings, firewall rules, or credentials;
 - transmit attack traffic or actively probe hosts.
 
 Every remediation it suggests is a **manual action for you to take**. The single
-state-changing operation it exposes is letting *you* flag a device as
+state-changing operation it exposes by default is letting *you* flag a device as
 "suspicious" for closer monitoring. Run it **only on networks you own or are
 authorised to monitor.**
+
+The one exception is opt-in. The **response engine** ships inert: it only records
+which device it *would* quarantine. Only if you configure a firewall responder does it
+run *your own* quarantine command, and only on a CRITICAL composite worm verdict, with
+protected hosts, a circuit breaker and automatic release. See
+[Configuration](#configuration).
 
 ---
 
@@ -230,7 +237,7 @@ wyvern -c config.yaml <command>        # use a config file
 
 Copy [`config.example.yaml`](config.example.yaml), edit, and pass with `-c`. You
 can declare known `gpu_hosts` (to silence inference false-positives), tune every
-threshold, set `internal_cidrs`, and configure alerting. Two containment-focused
+threshold, set `internal_cidrs`, and configure alerting. Three containment-focused
 settings are **off by default**:
 
 - `no_egress_hosts` — declare isolated/quarantined hosts (IPs or MACs) that must
@@ -238,6 +245,15 @@ settings are **off by default**:
 - `enforce` — when enabled, high-confidence alerts are POSTed (HMAC-signed) to an
   **external** actuator (firewall/egress controller) that can cut the flow. Wyvern
   stays passive; it only hands off a signed finding — it never blocks packets.
+- `response` — the Tier-1 response engine. The default, `mode: observe`, only records
+  which device Wyvern *would* quarantine. With `responder: firewall`, it runs your own
+  `firewall_quarantine_cmd` / `firewall_release_cmd` templates (no shell) against the
+  device named by a CRITICAL `worm_signature` verdict — never on a single detector.
+  `mode: confirm` records the action as pending until it is approved; `mode: auto`
+  applies it immediately and should be treated as experimental. Protected assets (the
+  gateway, DNS, the sensor itself and anything in `protected_hosts`) are never
+  actioned, a circuit breaker caps actions per window, and every quarantine expires
+  after `quarantine_ttl_s`.
 
 **Secrets never live in the file** — the SMTP password and the enforcement signing
 secret are read only from `WYVERN_SMTP_PASSWORD` and `WYVERN_ENFORCE_SECRET`.
@@ -249,8 +265,9 @@ capture/   scapy live capture + dpkt frame decoding  -> normalised events
 models/    immutable Device / Alert / Event / Profile dataclasses
 tracking/  device registry + passive OS/role fingerprinting (OUI, TTL, DHCP)
 baseline/  24h per-device behavioural learning + persistence
-detectors/ 8 stage detectors + the worm_signature correlator
-assessment/ threat scoring + manual remediation
+detectors/ 10 stage detectors + the worm_signature correlator
+assessment/ threat scoring, manual remediation + visibility (what the sensor can't see)
+response/  opt-in response engine — inert by default (observe-only)
 storage/   SQLite + append-only JSONL forensic log + exporters
 alerting/  desktop notifications + optional email digest (off by default)
 engine/    Monitor orchestrator + SSE bus
