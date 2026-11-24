@@ -23,6 +23,18 @@ class Decision:
     PENDING = "pending"  # eligible; confirm mode — awaiting human approval
 
 
+class ActionRefusedError(Exception):
+    """An approve/release request was refused; ``str(exc)`` says why.
+
+    ``not_found`` distinguishes an unknown record id from a gate refusal so
+    callers (API, CLI) can report it differently.
+    """
+
+    def __init__(self, reason: str, *, not_found: bool = False) -> None:
+        super().__init__(reason)
+        self.not_found = not_found
+
+
 class QState:
     """Lifecycle of a quarantine record."""
 
@@ -48,6 +60,7 @@ class QuarantineRecord:
     expires_at: float
     alert_id: str | None = None
     stage_count: int | None = None
+    severity: int | None = None  # the verdict's severity, re-checked on approve
     released_at: float | None = None
     ip: str | None = None  # for responders that act on an IP
     mac: str | None = None  # for responders that act on a MAC
@@ -65,6 +78,7 @@ class QuarantineRecord:
             "expires_at": self.expires_at,
             "alert_id": self.alert_id,
             "stage_count": self.stage_count,
+            "severity": self.severity,
             "released_at": self.released_at,
             "ip": self.ip,
             "mac": self.mac,
@@ -82,6 +96,7 @@ class QuarantineRecord:
             expires_at=row["expires_at"],
             alert_id=row.get("alert_id"),
             stage_count=row.get("stage_count"),
+            severity=row.get("severity"),
             released_at=row.get("released_at"),
             ip=row.get("ip"),
             mac=row.get("mac"),

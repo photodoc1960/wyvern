@@ -36,7 +36,7 @@ from ..detectors.stream_timing import StreamTimingDetector
 from ..models.alert import Alert, Severity
 from ..models.device import Device
 from ..models.events import ConnEvent, NetworkEvent, StreamSegmentEvent
-from ..response import build_response_engine
+from ..response import QuarantineRecord, build_response_engine
 from ..storage.db import WyvernDB
 from ..storage.eventlog import EventLog
 from ..tracking.registry import DeviceRegistry
@@ -395,6 +395,33 @@ class Monitor:
                 self.db.upsert_device(device)
                 self.bus.publish({"type": "device_update", "device": device.to_dict()})
         return ok
+
+    # ----------------------------------------------------------- response
+    def quarantines(self) -> list[dict]:
+        """All quarantine records, newest first."""
+        with self._lock:
+            records = self.response.store.all()
+        records.sort(key=lambda r: r.proposed_at, reverse=True)
+        return [r.to_row() for r in records]
+
+    def approve_quarantine(self, record_id: str) -> dict:
+        """Apply a PENDING quarantine. Raises :class:`ActionRefusedError` if a gate says no."""
+        with self._lock:
+            rec = self.response.approve(record_id, now=time.time())
+        log.warning("quarantine %s for %s approved -> %s", rec.id, rec.target, rec.status)
+        return self._publish_quarantine(rec)
+
+    def release_quarantine(self, record_id: str) -> dict:
+        """Lift (or dismiss) a quarantine. Raises :class:`ActionRefusedError` if it can't."""
+        with self._lock:
+            rec = self.response.release(record_id, now=time.time())
+        log.warning("quarantine %s for %s released", rec.id, rec.target)
+        return self._publish_quarantine(rec)
+
+    def _publish_quarantine(self, rec: QuarantineRecord) -> dict:
+        row = rec.to_row()
+        self.bus.publish({"type": "quarantine_update", "quarantine": row})
+        return row
 
     # ----------------------------------------------------------- run loops
     def start_live(self) -> None:

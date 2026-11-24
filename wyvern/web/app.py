@@ -22,8 +22,10 @@ def create_app(monitor) -> Flask:
     origins = [
         f"http://127.0.0.1:{port}",
         f"http://localhost:{port}",
+        f"http://[::1]:{port}",
         f"http://{getattr(monitor.config, 'web_host', '127.0.0.1')}:{port}",
     ]
+    app.config["WYVERN_ORIGINS"] = tuple(origins)
     try:
         from flask_cors import CORS
 

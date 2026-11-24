@@ -96,5 +96,9 @@ th { color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font
 tr.worm td { background: rgba(200,30,74,.09); }  /* matches --critical */
 .watch { cursor: pointer; background: #1c2433; border: 1px solid var(--line); color: var(--ink); border-radius: 5px; padding: 3px 8px; font-size: 11px; }
 .watch.on { background: var(--high); color: #0b0e14; border: none; }
+.q-act { cursor: pointer; background: #1c2433; border: 1px solid var(--line); color: var(--ink); border-radius: 5px; padding: 3px 8px; font-size: 11px; margin-right: 4px; }
+.q-act.approve { background: var(--high); color: #0b0e14; border: none; }
+.q-msg { color: var(--muted); font-size: 12px; margin: 8px 0 0; min-height: 1em; }
+[hidden] { display: none !important; }
 footer { color: #5d6776; font-size: 11px; padding: 8px 20px 24px; text-align: center; }
 @media (max-width: 980px) { main { grid-template-columns: 1fr; } }

@@ -1,17 +1,25 @@
 """JSON + SSE API blueprint backed by a :class:`Monitor`.
 
-All endpoints are read-only except ``POST /api/devices/<id>/suspicious``, which
-is the single user-initiated write the brief allows: flagging a device for
-deeper monitoring. Nothing here changes the network or any device.
+All endpoints are read-only except two kinds of user-initiated write:
+
+* ``POST /api/devices/<id>/suspicious`` flags a device for deeper monitoring.
+* ``POST /api/quarantines/<id>/approve|release`` drive the opt-in response
+  engine (``response.mode: confirm``). These can run the operator's own firewall
+  command, so they are accepted only from the sensor itself (loopback), as JSON,
+  from the dashboard's own origin — see :func:`_action_refused`.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import queue
 import time
+from urllib.parse import urlsplit
 
 from flask import Blueprint, Response, current_app, jsonify, request
+
+from ..response import ActionRefusedError
 
 api = Blueprint("api", __name__)
 
@@ -55,6 +63,72 @@ def set_suspicious(identifier: str):
     if not ok:
         return jsonify({"ok": False, "error": "device not found"}), 404
     return jsonify({"ok": True, "identifier": identifier, "suspicious": value})
+
+
+@api.get("/api/quarantines")
+def quarantines():
+    records = _monitor().quarantines()
+    status = request.args.get("status")
+    if status:
+        records = [r for r in records if r["status"] == status]
+    return jsonify(records)
+
+
+@api.post("/api/quarantines/<record_id>/approve")
+def approve_quarantine(record_id: str):
+    return _quarantine_action(_monitor().approve_quarantine, record_id)
+
+
+@api.post("/api/quarantines/<record_id>/release")
+def release_quarantine(record_id: str):
+    return _quarantine_action(_monitor().release_quarantine, record_id)
+
+
+def _quarantine_action(action, record_id: str):
+    refused = _action_refused()
+    if refused:
+        return jsonify({"ok": False, "error": refused}), 403
+    try:
+        record = action(record_id)
+    except ActionRefusedError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404 if exc.not_found else 409
+    if record["status"] == "failed":
+        return jsonify({"ok": False, "error": "quarantine command failed", "record": record}), 502
+    return jsonify({"ok": True, "record": record})
+
+
+def _action_refused() -> str | None:
+    """Why a quarantine action request must be refused, or None if it may proceed.
+
+    * Loopback client only — even if the dashboard is exposed on the LAN, a host
+      there (possibly the quarantined one) can't release or approve anything.
+    * JSON body — a cross-site form can't send one without a CORS preflight,
+      which the dashboard-only CORS policy fails (CSRF).
+    * Host and Origin must name the dashboard itself, defeating DNS rebinding.
+
+    A reverse proxy on the sensor itself makes every client look like loopback;
+    don't front the dashboard with one if the response engine is enabled.
+    """
+    try:
+        loopback = ipaddress.ip_address(request.remote_addr or "").is_loopback
+    except ValueError:
+        loopback = False
+    if not loopback:
+        return "quarantine actions are only accepted from the sensor itself (localhost)"
+    if not request.is_json:
+        return "quarantine actions require a JSON request"
+    origins = current_app.config.get("WYVERN_ORIGINS", ())
+    hosts = {urlsplit(o).hostname for o in origins} | {"localhost", "127.0.0.1", "::1"}
+    try:
+        host = urlsplit(f"//{request.host}").hostname
+    except ValueError:
+        host = None
+    if host not in hosts:
+        return "unexpected Host header"
+    origin = request.headers.get("Origin")
+    if origin is not None and origin not in origins:
+        return "cross-origin request refused"
+    return None
 
 
 @api.get("/api/export")

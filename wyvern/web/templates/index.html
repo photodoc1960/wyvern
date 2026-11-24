@@ -41,6 +41,18 @@
     </section>
   </main>
 
+  <section class="panel" id="quarantine-panel" hidden>
+    <h2>Response engine <small>approving runs your configured quarantine command</small></h2>
+    <table id="quarantines">
+      <thead>
+        <tr><th>Status</th><th>Target</th><th>IP</th><th>Mode</th><th>Proposed</th>
+            <th>Expires</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p id="quarantine-msg" class="q-msg"></p>
+  </section>
+
   <section class="panel">
     <h2>Devices</h2>
     <table id="devices">
@@ -53,8 +65,9 @@
   </section>
 
   <footer>
-    Wyvern observes, alerts and recommends only — it never modifies devices,
-    processes, credentials or network settings. Signatures from Guan et al.,
+    Wyvern observes, alerts and recommends — by default it never modifies devices,
+    processes, credentials or network settings; the opt-in response engine acts
+    only through your own configured command. Signatures from Guan et al.,
     <em>AI Agents Enable Adaptive Computer Worms</em> (arXiv:2606.03811).
   </footer>
 
