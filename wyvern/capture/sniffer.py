@@ -30,6 +30,7 @@ class LiveSniffer:
         self.callback = callback
         self.bpf_filter = bpf_filter
         self._sniffer = None
+        self._socket = None
 
     def start(self) -> None:
         try:
@@ -37,18 +38,40 @@ class LiveSniffer:
         except ImportError as exc:  # pragma: no cover - environment dependent
             raise RuntimeError("scapy is required for live capture (pip install scapy)") from exc
 
-        self._sniffer = AsyncSniffer(
-            iface=self.interface,
-            filter=self.bpf_filter,
-            store=False,
-            prn=self._on_packet,
-        )
+        # Open the socket ourselves and hand it to scapy, so we keep a handle and
+        # can read its drop counter. Without that, packet loss is invisible and
+        # looks exactly like a quiet network.
+        try:
+            from scapy.config import conf
+
+            self._socket = conf.L2listen(iface=self.interface, filter=self.bpf_filter)
+            self._sniffer = AsyncSniffer(
+                opened_socket=self._socket, store=False, prn=self._on_packet
+            )
+        except Exception:  # noqa: BLE001 - fall back to scapy managing the socket
+            log.debug("could not open the capture socket directly", exc_info=True)
+            self._socket = None
+            self._sniffer = AsyncSniffer(
+                iface=self.interface,
+                filter=self.bpf_filter,
+                store=False,
+                prn=self._on_packet,
+            )
         self._sniffer.start()
         log.info(
             "live capture started on %s (filter=%r)",
             self.interface or "default",
             self.bpf_filter,
         )
+
+    def poll_stats(self) -> tuple[int, int] | None:
+        """One destructive read of the capture socket's packet/drop counters."""
+        from .stats import poll_socket
+
+        sock = getattr(self._socket, "ins", None) or self._socket
+        if sock is None:
+            return None
+        return poll_socket(sock)
 
     def _on_packet(self, pkt) -> None:
         try:

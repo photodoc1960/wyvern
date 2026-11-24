@@ -170,7 +170,8 @@ def _cmd_simulate(cfg: Config, args) -> int:
     mon.feed_events(events)
     print(f"simulated {len(events)} events; raised {len(mon._recent_alerts)} alerts.")
     _print_report(mon.current_assessment())
-    _print_visibility(mon)
+    # No visibility block here: the scenario is a synthetic in-memory trace, so
+    # there is no capture position to describe and the numbers would mislead.
     if args.web:
         from .web.app import run_dashboard
 
@@ -219,6 +220,14 @@ def _print_visibility(mon) -> None:
     )
     if rep.dormant:
         print(f"    DORMANT detectors (cannot fire here): {', '.join(rep.dormant)}")
+    cap = rep.capture or {}
+    if cap.get("available"):
+        print(
+            f"    capture: {cap['packets']} packets, {cap['drops']} dropped "
+            f"({cap['drop_fraction'] * 100:.1f}%)"
+        )
+    if cap.get("warning"):
+        print(f"    WARNING: {cap['warning']}")
     if rep.unenforceable_no_egress:
         print(
             "    UNENFORCEABLE no_egress_hosts (traffic never observed): "

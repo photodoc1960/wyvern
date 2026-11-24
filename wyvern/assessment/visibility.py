@@ -132,6 +132,7 @@ class VisibilityReport:
     devices_with_internal_unicast: int
     dormant: tuple[str, ...]
     unenforceable_no_egress: tuple[str, ...]
+    capture: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -144,6 +145,7 @@ class VisibilityReport:
             "devices_with_internal_unicast": self.devices_with_internal_unicast,
             "dormant_detectors": list(self.dormant),
             "unenforceable_no_egress": list(self.unenforceable_no_egress),
+            "capture": self.capture,
         }
 
 
@@ -152,6 +154,7 @@ def assess_visibility(
     *,
     alert_counts: Mapping[str, int] | None = None,
     no_egress_hosts: tuple[str, ...] = (),
+    capture: dict | None = None,
 ) -> VisibilityReport:
     """Derive the visibility report from observed traffic classes.
 
@@ -205,4 +208,5 @@ def assess_visibility(
         devices_with_internal_unicast=len(counters.internal_unicast_devices),
         dormant=dormant,
         unenforceable_no_egress=unenforceable,
+        capture=capture,
     )
