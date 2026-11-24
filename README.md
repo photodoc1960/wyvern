@@ -136,15 +136,21 @@ pure and fully unit-tested.
 | `idle_exec` | **self-replication / code exec** | a printer/router/NAS/camera starts **originating** connections |
 | `dns_anomaly` | C2 lookups | query spikes, NXDOMAIN bursts, DGA-looking domains |
 
-`stream_timing` closes the gap where a worm routes its reasoning proxy over standard
+`stream_timing` narrows the gap where a worm routes its reasoning proxy over standard
 HTTPS to an external API — port 443, encrypted, so `inference_api`'s port/URL matching
 sees nothing. Following Alhazbi et al. (2025, IEEE OJ-COMS), it passively measures the
 inter-packet cadence LLM autoregressive generation leaves on the streamed response
 (**no TLS interception, no payload inspected**). It never alerts on its own: the
 `worm_signature` correlator only lets the rhythm *raise confidence* in an
 `inference_api` finding for the same device. Defaults are deliberately conservative to
-avoid false positives on ordinary long-lived HTTPS (video, downloads, websockets). This
-addresses the "`inference_api` blind to LLM inference routed over HTTPS" limitation in
+avoid false positives on ordinary long-lived HTTPS (video, downloads, websockets).
+
+Treat it as a partial and decaying signal, not a closed gap. LLM providers increasingly
+batch tokens and pad responses server-side, *before* encryption, specifically to defeat
+this side channel; for those providers the rhythm never reaches the wire, so
+`stream_timing` stays silent and nothing tells you it is blind. Cheap traffic morphing
+does the same on the attacker's side. HTTP/3 (QUIC) streams are not measured at all,
+since `stream_timing` only watches TCP 443. See
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 `beacon` grades its jitter test over **two bands** instead of demanding a metronomic
@@ -278,6 +284,29 @@ that replays the synthetic worm trace and asserts a Critical verdict.
   to fit your network and cut false positives.
 - A future, stealth-hardened worm could suppress these signatures — the paper
   notes the PoC deliberately does not. Wyvern targets the signatures that exist.
+- **What it sees depends on where it runs** — see the callout at the top. On a
+  client-mode deployment several detectors cannot fire, and a quiet dashboard proves
+  nothing.
+
+### Known blind spots
+
+These are documented evasions with their research sources, design-scope verdicts and
+candidate hardening in
+[docs/THREAT_MODEL.md § Known limitations and evasions](docs/THREAT_MODEL.md#known-limitations-and-evasions).
+None of them produce an alert, so you won't see a warning when they apply.
+
+- **Aperiodic C2.** MCP-style task polling is demand-driven with lognormal gaps, not
+  periodic; it scores as benign in published beacon detectors and in `beacon`.
+- **C2 over first-party cloud on 443.** `beacon` only considers non-standard ports, to
+  avoid flagging every app's update checks, so C2 through a mainstream cloud service on
+  HTTPS is excluded.
+- **UDP and QUIC.** Worm stages come from TCP connection starts; UDP flows, including
+  HTTP/3, contribute none.
+- **Encrypted DNS (DoH/DoT).** A device using DoH or DoT shows `dns_anomaly` nothing.
+- **LLM inference over HTTPS.** `stream_timing` is a partial signal that
+  provider-side token batching and traffic morphing erase (see above).
+- **Application-layer agent worms.** Prompt-injection propagation through RAG content,
+  agent messaging or steganographic tool output leaves no network-layer signature.
 
 ## Documentation
 
