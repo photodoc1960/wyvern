@@ -211,6 +211,10 @@ with a 0-100 score, the worm stages observed, and **manual** remediation steps:
 > *Isolate [device] · Change credentials on [targets] · Reboot [device] · Run a
 > process scan · Check [device]'s recent connections in system logs.*
 
+The score counts each distinct signal (detector + stage) once, at its strongest
+severity, so a chatty detector re-firing all hour cannot escalate a device on
+volume alone; corroboration across different behaviours and worm stages does.
+
 ## Dashboard
 
 `--web` serves a dark, offline-friendly Flask dashboard (no external CDNs):

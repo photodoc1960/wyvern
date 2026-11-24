@@ -28,6 +28,19 @@ _SEVERITY_WEIGHT = {
 _WORM_STAGE_SET = frozenset(WORM_STAGES)
 
 
+def _signal_weights(items: Iterable[Alert]) -> dict[tuple[str, str | None], float]:
+    """Strongest weight per distinct signal (detector + stage).
+
+    Repeats of one signal are one piece of evidence, not many: a chatty detector
+    re-firing all hour must not out-score corroboration across behaviours.
+    """
+    signals: dict[tuple[str, str | None], float] = {}
+    for alert in items:
+        key = (alert.detector, alert.stage)
+        signals[key] = max(signals.get(key, 0.0), _SEVERITY_WEIGHT[alert.severity])
+    return signals
+
+
 def _level_from_score(score: float) -> Severity:
     if score >= 80:
         return Severity.CRITICAL
@@ -144,7 +157,7 @@ class ThreatAssessor:
     ) -> DeviceThreat:
         device = registry.get(key) or registry.get_by_ip(key)
         severities = [a.severity for a in items]
-        weights = sorted((_SEVERITY_WEIGHT[s] for s in severities), reverse=True)
+        weights = sorted(_signal_weights(items).values(), reverse=True)
         worm_stages = sorted({a.stage for a in items if a.stage in _WORM_STAGE_SET})
         has_composite = any(a.detector == "worm_signature" for a in items)
 
