@@ -66,6 +66,14 @@ class QuarantineRecord:
     mac: str | None = None  # for responders that act on a MAC
     id: str = field(default_factory=new_id)
 
+    def lapsed(self, now: float) -> bool:
+        """True for a never-applied request past its TTL that no sweep has expired yet.
+
+        Approval already refuses these; listings use this to say "expired" rather
+        than offer an approval that cannot succeed.
+        """
+        return self.status in (QState.PROPOSED, QState.PENDING) and self.expires_at <= now
+
     def to_row(self) -> dict[str, Any]:
         """Flat, primitive mapping for DB persistence."""
         return {

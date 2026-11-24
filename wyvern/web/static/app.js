@@ -12,6 +12,12 @@ function fmtTime(ts) {
   const d = new Date(ts * 1000);
   return d.toLocaleTimeString();
 }
+function fmtDateTime(ts) {
+  if (!ts) return "";
+  return new Date(ts * 1000).toLocaleString([], {
+    year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
 async function api(path) {
   const r = await fetch(path);
   if (!r.ok) throw new Error(path + " -> " + r.status);
@@ -155,6 +161,10 @@ function renderDevices(list) {
 function renderQuarantines(list) {
   $("#quarantine-panel").hidden = !list.length;
   $("#quarantines tbody").innerHTML = list.map((q) => {
+    // A request past its TTL can't be approved (the server refuses it); show it as
+    // expired now rather than waiting for the monitor's next sweep to mark it.
+    const lapsed = ["proposed", "pending"].includes(q.status) && q.expires_at * 1000 <= Date.now();
+    if (lapsed) q = { ...q, status: "expired" };
     const live = ["proposed", "pending", "active", "failed"].includes(q.status);
     const buttons = [
       q.status === "pending" ? `<button class="q-act approve" data-act="approve" data-id="${escapeHtml(q.id)}">approve</button>` : "",
@@ -162,7 +172,7 @@ function renderQuarantines(list) {
     ].join("");
     return `<tr>
       <td>${escapeHtml(q.status)}</td><td>${escapeHtml(q.target)}</td><td>${escapeHtml(q.ip || "")}</td>
-      <td>${escapeHtml(q.mode)}</td><td>${fmtTime(q.proposed_at)}</td><td>${fmtTime(q.expires_at)}</td>
+      <td>${escapeHtml(q.mode)}</td><td>${fmtDateTime(q.proposed_at)}</td><td>${fmtDateTime(q.expires_at)}</td>
       <td>${buttons}</td>
     </tr>`;
   }).join("");
