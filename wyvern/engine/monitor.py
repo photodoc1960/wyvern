@@ -28,6 +28,7 @@ from ..baseline.learner import BaselineLearner
 from ..baseline.store import load_baselines, save_baselines
 from ..capture.decode import decode_frame
 from ..config import Config
+from ..constants import HINT_STAGES
 from ..detectors.base import DetectorContext
 from ..detectors.loader import default_detectors, make_correlator
 from ..detectors.stream_timing import StreamTimingDetector
@@ -41,6 +42,15 @@ from .bus import EventBus
 
 log = logging.getLogger("wyvern.monitor")
 _MAX_EDGES = 4000
+
+
+def _surfaced(alerts: list[Alert]) -> list[Alert]:
+    """Alerts to emit: everything except hint-only corroboration signals.
+
+    Hints (see ``HINT_STAGES``) have already reached the correlator, which is
+    the only place they matter; surfacing them alone would be noise.
+    """
+    return [a for a in alerts if a.stage not in HINT_STAGES]
 
 
 class Monitor:
@@ -140,11 +150,12 @@ class Monitor:
             produced.extend(detector.inspect(event, ctx))
         produced.extend(self.correlator.correlate(produced, ctx, event.ts))
 
-        for alert in produced:
+        surfaced = _surfaced(produced)
+        for alert in surfaced:
             self._emit(alert)
-        if produced:
+        if surfaced:
             self._publish_assessment(event.ts)
-        return produced
+        return surfaced
 
     def feed_events(self, events: Iterable[NetworkEvent]) -> list[Alert]:
         out: list[Alert] = []
@@ -165,7 +176,8 @@ class Monitor:
         for detector in self.detectors:
             produced.extend(detector.sweep(ctx))
         produced.extend(self.correlator.correlate(produced, ctx, now))
-        for alert in produced:
+        surfaced = _surfaced(produced)
+        for alert in surfaced:
             self._emit(alert)
 
         self._persist_devices()
@@ -179,7 +191,7 @@ class Monitor:
             except Exception:  # noqa: BLE001
                 log.debug("email digest failed", exc_info=True)
         self._publish_assessment(now)
-        return produced
+        return surfaced
 
     # ----------------------------------------------------------- emission
     def _emit(self, alert: Alert) -> None:

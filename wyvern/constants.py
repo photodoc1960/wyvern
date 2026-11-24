@@ -162,6 +162,12 @@ STAGE_REPLICATION = "idle_device_exec"
 # would let two facets of the same behaviour trip the 2-stage worm verdict).
 STAGE_INFERENCE_TIMING = "inference_timing"
 
+# Stages that are corroboration input only. Detectors still produce them and the
+# correlator still consumes them, but the Monitor never surfaces them as alerts:
+# on their own they are too weak to act on (a stock ticker or SSE dashboard can
+# share the cadence) and, per issue #61, increasingly absent on the wire.
+HINT_STAGES: frozenset[str] = frozenset({STAGE_INFERENCE_TIMING})
+
 # A jittered-but-periodic callback (CoV inside ``beacon_tight_cov..beacon_max_cov``).
 # Deliberately NOT in WORM_STAGES: benign jittered polling — OS/app update checks,
 # vendor telemetry, push keep-alives — lives in that same dispersion band, and the

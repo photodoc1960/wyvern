@@ -152,3 +152,47 @@ def test_timing_signal_alone_does_not_corroborate(config, registry):
     # NOT counted as a worm stage.
     assert w.correlate([_timing_alert(1.0)], ctx, 1.0) == []
     assert w.active_stages("00:80:77:aa:bb:cc", 1.0) == []
+
+
+# ------------------------------------------------ surfacing through the Monitor
+
+
+def _monitor(tmp_path):
+    from wyvern.engine.monitor import Monitor
+    from wyvern.storage.db import WyvernDB
+
+    return Monitor(Config(data_dir=str(tmp_path)).validate(), learn=False, db=WyvernDB(":memory:"))
+
+
+def _stream_to(mon, mk, mac, base=1000.0):
+    """Register CLIENT under ``mac`` and feed it a token-cadence response stream."""
+    mon.process_event(ArpEvent(ts=base - 1.0, src_mac=mac, src_ip=CLIENT, op=2))
+    ts = base
+    for i in range(45):
+        mon.process_event(mk.stream(CLIENT, SERVER, ts, size=200))
+        ts += [30, 50, 70, 40, 60][i % 5] / 1000.0
+    return ts
+
+
+def test_timing_hint_alone_is_not_surfaced(tmp_path, mk):
+    # Issue #17: a lone token-cadence stream must not produce a user-facing alert.
+    mon = _monitor(tmp_path)
+    ts = _stream_to(mon, mk, "00:80:77:aa:bb:cc")
+    assert mon.sweep(now=ts + 1.0) == []
+    assert not [a for a in mon.recent_alerts() if a["detector"] == "stream_timing"]
+
+
+def test_timing_hint_still_corroborates_inference(tmp_path, mk):
+    # Suppressing the standalone hint must not break the "both fire" path.
+    mac = "00:80:77:aa:bb:cc"
+    mon = _monitor(tmp_path)
+    ts = _stream_to(mon, mk, mac)
+    mon.sweep(now=ts + 1.0)
+    mon.process_event(mk.infer(CLIENT, "192.168.1.99", ts + 5.0, mac=mac))
+    corrob = [
+        a
+        for a in mon.recent_alerts()
+        if a["detector"] == "stream_timing" and a["stage"] == STAGE_INFERENCE
+    ]
+    assert len(corrob) == 1
+    assert corrob[0]["evidence"]["corroborating_signals"] == ["inference_api", "stream_timing"]
