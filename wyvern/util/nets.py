@@ -133,6 +133,17 @@ def is_multicast_ip(ip: str | None) -> bool:
     return bool(addr and addr.is_multicast)
 
 
+def is_link_local(ip: str | None) -> bool:
+    """True for an IPv4 (169.254/16) or IPv6 (fe80::/10) link-local address.
+
+    Link-local addresses never cross a router, so they always name an on-link
+    peer — but they are a device's secondary identity. On a dual-stack LAN every
+    host also has one, so treating them as distinct hosts double-counts devices.
+    """
+    addr = _parse_ip(ip)
+    return bool(addr and addr.is_link_local)
+
+
 def is_usable_host_ip(ip: str | None) -> bool:
     """True for an ordinary unicast host address worth tracking.
 

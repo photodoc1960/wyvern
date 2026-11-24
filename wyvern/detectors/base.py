@@ -17,7 +17,7 @@ from ..models.device import Device
 from ..models.events import NetworkEvent
 from ..models.profile import DeviceProfile
 from ..tracking.registry import DeviceRegistry
-from ..util.nets import is_internal_ip
+from ..util.nets import is_internal_ip, is_link_local
 
 
 class ProfileProvider(Protocol):
@@ -58,6 +58,25 @@ def source_id(event: NetworkEvent) -> str | None:
     if mac:
         return mac
     return getattr(event, "src_ip", None)
+
+
+def peer_id(event: NetworkEvent, ctx: DetectorContext) -> str | None:
+    """A per-destination key that counts one peer once across its addresses.
+
+    A dual-stack peer is reachable at its routable address *and* an IPv6
+    link-local one; counting distinct destination addresses would count it twice
+    and inflate fan-out detectors (lateral movement, credential spray) — three
+    SMB hosts would look like six (issue #41). Link-local traffic never crosses a
+    router, so the frame's destination MAC reliably identifies the peer: map it
+    to that device's routable address. Routable destinations stay keyed by
+    address, because behind a router the destination MAC is the router's.
+    """
+    dst = getattr(event, "dst_ip", None)
+    if is_link_local(dst):
+        device = ctx.registry.get(getattr(event, "dst_mac", None)) or ctx.registry.get_by_ip(dst)
+        if device is not None and device.ip and not is_link_local(device.ip):
+            return device.ip
+    return dst
 
 
 _COOLDOWN_PRUNE_FLOOR = 1024

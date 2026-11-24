@@ -15,6 +15,7 @@ Two entry points drive everything:
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import threading
 import time
@@ -33,11 +34,13 @@ from ..detectors.base import DetectorContext
 from ..detectors.loader import default_detectors, make_correlator
 from ..detectors.stream_timing import StreamTimingDetector
 from ..models.alert import Alert, Severity
+from ..models.device import Device
 from ..models.events import ConnEvent, NetworkEvent, StreamSegmentEvent
 from ..response import build_response_engine
 from ..storage.db import WyvernDB
 from ..storage.eventlog import EventLog
 from ..tracking.registry import DeviceRegistry
+from ..util.nets import is_link_local
 from .bus import EventBus
 
 log = logging.getLogger("wyvern.monitor")
@@ -51,6 +54,22 @@ def _surfaced(alerts: list[Alert]) -> list[Alert]:
     the only place they matter; surfacing them alone would be noise.
     """
     return [a for a in alerts if a.stage not in HINT_STAGES]
+
+
+def _attribute_to_device(alert: Alert, device: Device | None) -> Alert:
+    """Report an alert raised from a link-local source under the device's
+    routable address, keeping the observed address in evidence.
+
+    Without this, one dual-stack device's alerts split across two ``src_ip``
+    values, so anything that groups alerts by address (exports, ad-hoc queries)
+    shows it as two devices (issue #41).
+    """
+    if device is None or not device.ip or alert.src_ip == device.ip:
+        return alert
+    if not is_link_local(alert.src_ip) or is_link_local(device.ip):
+        return alert
+    evidence = {**alert.evidence, "observed_src_ip": alert.src_ip}
+    return dataclasses.replace(alert, src_ip=device.ip, evidence=evidence)
 
 
 class Monitor:
@@ -196,7 +215,7 @@ class Monitor:
     # ----------------------------------------------------------- emission
     def _emit(self, alert: Alert) -> None:
         device = self.registry.resolve(alert.src_ip, alert.src_mac)
-        alert = enrich(alert, device)
+        alert = enrich(_attribute_to_device(alert, device), device)
         with self._lock:
             self._recent_alerts.append(alert)
         try:

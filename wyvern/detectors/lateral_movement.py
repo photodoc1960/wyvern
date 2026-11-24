@@ -13,7 +13,7 @@ from ..models.alert import Alert, Severity
 from ..models.device import DeviceRole
 from ..models.events import ConnEvent, NetworkEvent
 from ..util.timewindow import KeyedWindows
-from .base import Cooldown, Detector, DetectorContext, clamp01, source_id
+from .base import Cooldown, Detector, DetectorContext, clamp01, peer_id, source_id
 
 
 class LateralMovementDetector(Detector):
@@ -36,7 +36,7 @@ class LateralMovementDetector(Detector):
         if sid is None:
             return []
 
-        win = self._peers.add(sid, event.ts, event.dst_ip)
+        win = self._peers.add(sid, event.ts, peer_id(event, ctx))
         if is_worm_service_port(event.dst_port):
             self._services.add(sid, event.ts, event.dst_port)
         peers = win.distinct(event.ts)
